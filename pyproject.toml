@@ -1,27 +1,27 @@
 [build-system]
-requires = [ "poetry-core",]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "tkan" 
-version = "0.4.3" 
+name = "tkan"
+version = "0.5.0"
 description = "Temporal KAN model"
-authors = [ "Rémi Genet", "Hugo Inzirillo"]  
-readme = "README.md"  
-packages = [{include = "tkan"}]  
+authors = ["Rémi Genet", "Hugo Inzirillo"]
+readme = "README.md"
+packages = [{include = "tkan"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.13"
-keras = "^3.0.0"
-keras_efficient_kan = "^0.1.9"
+jax = "^0.4.13"
+jaxlib = "^0.4.13"
+optax = "^0.1.7"
+jax2onnx = "^0.1"
+pyyaml = "^6.0"
+pandas = "^2.0"
+pyarrow = "^14.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.0"
-pytest-xdist = "^3.6.1"
-tensorflow = "^2.15.0"
-torch = "^2.0.0"
-jax = "^0.4.13"
-jaxlib = "^0.4.13"
 
 [tool.pytest.ini_options]
 addopts = "-v"
@@ -30,6 +30,4 @@ filterwarnings = [
     "ignore:Can't initialize NVML:UserWarning",
     "ignore:jax.xla_computation is deprecated:DeprecationWarning",
     "ignore::DeprecationWarning:jax._src.dtypes",
-    "ignore:Type google._upb._message.MessageMapContainer uses PyType_Spec with a metaclass that has custom tp_new:DeprecationWarning:importlib",
-    "ignore:Type google._upb._message.ScalarMapContainer uses PyType_Spec with a metaclass that has custom tp_new:DeprecationWarning:importlib",
 ]

@@ -1,128 +1,135 @@
-// live.mq5 - Simple ONNX trading bot
 #property copyright "Simple"
-#property version   "1.00"
+#property version "1.00"
 #property strict
 
-#include <OnnxRuntime.mqh>
-
 input double LotSize = 0.01;
-input string OnnxFile = "model.onnx";
-input int NumCandles = 45;
+input int    TimeframeMinutes = 60;
+input int    NumCandles = 45;
+input int    NumFeats = 40;
 
 datetime lastBar = 0;
+long OnnxHandle = INVALID_HANDLE;
+ENUM_TIMEFRAMES TF;
 
-int OnnxHandle = INVALID_HANDLE;
+string Symbols[] = {
+   "BTCUSD", "ETHUSD", "ADAUSD", "EOSUSD", "MATICUSD",
+   "TRXUSD", "XLMUSD", "LINKUSD", "BCHUSD", "LTCUSD"
+};
+
+#resource "model.onnx" as uchar ExtModel[]
+
+double NormMin[];
+double NormMax[];
 
 int OnInit() {
-   Print("Loading ONNX: ", OnnxFile);
-   OnnxHandle = OnnxRuntime::Load(OnnxFile);
-   if(OnnxHandle == INVALID_HANDLE) {
-      Print("ERROR: Failed to load ONNX");
-      return INIT_FAILED;
+   if(TimeframeMinutes < 1) { Print("TimeframeMinutes must be >= 1"); return INIT_FAILED; }
+   switch(TimeframeMinutes) {
+      case 1:  TF = PERIOD_M1;  break;
+      case 5:  TF = PERIOD_M5;  break;
+      case 15: TF = PERIOD_M15; break;
+      case 30: TF = PERIOD_M30; break;
+      case 60: TF = PERIOD_H1;  break;
+      case 240: TF = PERIOD_H4; break;
+      case 1440: TF = PERIOD_D1; break;
+      default:  TF = PERIOD_CURRENT; break;
    }
-   Print("ONNX loaded OK");
+
+   OnnxHandle = OnnxCreateFromBuffer(ExtModel, ONNX_DEFAULT);
+   if(OnnxHandle == INVALID_HANDLE) { Print("ONNX create failed: ", GetLastError()); return INIT_FAILED; }
+
+   if(!LoadNormParams())
+      Print("WARNING: norm_params.csv not found");
    return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int reason) {
-   if(OnnxHandle != INVALID_HANDLE) {
-      OnnxRuntime::Free(OnnxHandle);
-   }
+   if(OnnxHandle != INVALID_HANDLE) OnnxRelease(OnnxHandle);
 }
 
 void OnTick() {
-   if(Time[0] == lastBar) return;
-   lastBar = Time[0];
-   
-   // Wait for hour bar
-   if(iBarShift(NULL, PERIOD_H1, Time[0], true) == iBarShift(NULL, PERIOD_H1, Time[0], false)) {
-      return;
-   }
-   
+   datetime barTime = iTime(Symbol(), TF, 0);
+   if(barTime == lastBar) return;
+   lastBar = barTime;
    RunModel();
 }
 
 void RunModel() {
-   // Make input array [1, 45, 19]
-   double input[];
-   ArrayResize(input, NumCandles * 19);
-   
-   for(int i = 0; i < NumCandles; i++) {
-      int bar = NumCandles - 1 - i;
-      // OHLCV: open, high, low, close, volume * 3 + others
-      input[i * 19 + 0] = Open[bar];
-      input[i * 19 + 1] = High[bar];
-      input[i * 19 + 2] = Low[bar];
-      input[i * 19 + 3] = Close[bar];
-      input[i * 19 + 4] = Volume[bar];
-      // Fill rest with close
-      for(int k = 5; k < 19; k++) {
-         input[i * 19 + k] = Close[bar];
+   matrixf x(NumCandles, NumFeats);
+   for(int s = 0; s < ArraySize(Symbols); s++) {
+      string sym = Symbols[s];
+      for(int i = 0; i < NumCandles; i++) {
+         int bar = NumCandles - 1 - i;
+         x[i, s*4+0] = (float)iOpen(sym, TF, bar);
+         x[i, s*4+1] = (float)iHigh(sym, TF, bar);
+         x[i, s*4+2] = (float)iLow(sym, TF, bar);
+         x[i, s*4+3] = (float)iClose(sym, TF, bar);
       }
    }
-   
-// Run ONNX - input shape [1, 45, 19] -> output [1, 1]
-   double input[];
-   ArrayResize(input, 1 * NumCandles * 19);
-   
-   for(int i = 0; i < NumCandles; i++) {
-      int bar = NumCandles - 1 - i;
-      input[i * 19 + 0] = Open[bar];
-      input[i * 19 + 1] = High[bar];
-      input[i * 19 + 2] = Low[bar];
-      input[i * 19 + 3] = Close[bar];
-      input[i * 19 + 4] = (double)Volume[bar];
-      for(int k = 5; k < 19; k++) input[i * 19 + k] = Close[bar];
+
+   if(ArraySize(NormMin) == NumFeats) {
+      for(int f = 0; f < NumFeats; f++) {
+         double range = NormMax[f] - NormMin[f];
+         if(range < 1e-8) range = 1e-8;
+         for(int i = 0; i < NumCandles; i++)
+            x[i, f] = (float)((x[i, f] - NormMin[f]) / range);
+      }
    }
-   
-   double output[];
-   if(!OnnxRuntime::Run(OnnxHandle, input, output, 1, NumCandles, 19)) {
-      Print("ONNX run failed");
-      return;
-   }
-   
-   // Get prediction
-   double pred = output[0];
-   Print("Prediction: ", pred);
-   
-   // Trade
-   Trade(pred);
+
+   matrixf x3d[1];
+   x3d[0] = x;
+   vectorf y(1);
+   if(!OnnxRun(OnnxHandle, 0, x3d, y)) { Print("ONNX run failed: ", GetLastError()); return; }
+   Trade((double)y[0]);
 }
 
 void Trade(double pred) {
-   // Simple: if pred > 0.5 buy, if pred < 0.5 sell
    if(pred > 0.5) {
-      // Buy
-      if(PositionSelect(Symbol())) {
-         if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL) {
-            CloseTrade();
-         }
-      }
+      if(PositionSelect(Symbol()) && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL)
+         CloseTrade();
       if(!PositionSelect(Symbol())) {
-         double price = SymbolInfoDouble(Symbol(), SYMBOL_ASK);
-         int ticket = OrderSend(Symbol(), OP_BUY, LotSize, price, 3, 0, 0, "ONNX_BUY");
-         if(ticket > 0) Print("BUY ", ticket);
+         MqlTradeRequest req = {}; MqlTradeResult res = {};
+         req.action = TRADE_ACTION_DEAL; req.symbol = Symbol();
+         req.volume = LotSize; req.price = SymbolInfoDouble(Symbol(), SYMBOL_ASK);
+         req.type = ORDER_TYPE_BUY; req.comment = "TKAN_BUY";
+         if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE) Print("BUY");
       }
    } else if(pred < 0.5) {
-      // Sell
-      if(PositionSelect(Symbol())) {
-         if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) {
-            CloseTrade();
-         }
-      }
+      if(PositionSelect(Symbol()) && PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
+         CloseTrade();
       if(!PositionSelect(Symbol())) {
-         double price = SymbolInfoDouble(Symbol(), SYMBOL_BID);
-         int ticket = OrderSend(Symbol(), OP_SELL, LotSize, price, 3, 0, 0, "ONNX_SELL");
-         if(ticket > 0) Print("SELL ", ticket);
+         MqlTradeRequest req = {}; MqlTradeResult res = {};
+         req.action = TRADE_ACTION_DEAL; req.symbol = Symbol();
+         req.volume = LotSize; req.price = SymbolInfoDouble(Symbol(), SYMBOL_BID);
+         req.type = ORDER_TYPE_SELL; req.comment = "TKAN_SELL";
+         if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE) Print("SELL");
       }
    }
 }
 
 void CloseTrade() {
-   if(PositionSelect(Symbol())) {
-      int type = PositionGetInteger(POSITION_TYPE);
-      double price = (type == POSITION_TYPE_BUY) ? SymbolInfoDouble(Symbol(), SYMBOL_BID) : SymbolInfoDouble(Symbol(), SYMBOL_ASK);
-      int ticket = OrderSend(Symbol(), (type == POSITION_TYPE_BUY) ? OP_SELL : OP_BUY, PositionGetDouble(POSITION_VOLUME), price, 3, 0, 0, "CLOSE");
-      if(ticket > 0) Print("CLOSED ", ticket);
-   }
+   if(!PositionSelect(Symbol())) return;
+   int type = (int)PositionGetInteger(POSITION_TYPE);
+   MqlTradeRequest req = {}; MqlTradeResult res = {};
+   req.action = TRADE_ACTION_DEAL; req.symbol = Symbol();
+   req.volume = PositionGetDouble(POSITION_VOLUME);
+   req.price = (type == POSITION_TYPE_BUY) ? SymbolInfoDouble(Symbol(), SYMBOL_BID) : SymbolInfoDouble(Symbol(), SYMBOL_ASK);
+   req.type = (type == POSITION_TYPE_BUY) ? ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+   req.comment = "TKAN_CLOSE";
+   if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE) Print("CLOSED");
+}
+
+bool LoadNormParams() {
+   int h = FileOpen("norm_params.csv", FILE_READ | FILE_CSV | FILE_ANSI, ',');
+   if(h == INVALID_HANDLE) return false;
+   string minLine = FileReadString(h);
+   string maxLine = FileReadString(h);
+   FileClose(h);
+   string mn[], mx[];
+   int nMin = StringSplit(minLine, ',', mn);
+   int nMax = StringSplit(maxLine, ',', mx);
+   if(nMin != NumFeats || nMax != NumFeats) { Print("norm_params feat count mismatch"); return false; }
+   ArrayResize(NormMin, NumFeats); ArrayResize(NormMax, NumFeats);
+   for(int i = 0; i < NumFeats; i++) { NormMin[i] = StringToDouble(mn[i]); NormMax[i] = StringToDouble(mx[i]); }
+   Print("norm_params OK");
+   return true;
 }
