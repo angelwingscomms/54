@@ -2,14 +2,10 @@
 #property version "1.00"
 #property script_show_inputs
 
-input string InpStartDate = "2021.05.01";
-input string InpEndDate = "2021.07.01";
+input int InpBarsToCopy = 2000;
 
 void OnStart() {
-   datetime startTime = StringToTime(InpStartDate);
-   datetime endTime = StringToTime(InpEndDate);
-   
-   Print("Fetching BTCUSD data from ", InpStartDate, " to ", InpEndDate);
+   Print("Fetching BTCUSD data...");
    
    string filename = "data.csv";
    int fileHandle = FileOpen(filename, FILE_CSV|FILE_WRITE, ",");
@@ -24,7 +20,17 @@ void OnStart() {
    MqlRates rates[];
    ArraySetAsSeries(rates, true);
    
-   int copied = CopyRates("BTCUSD", PERIOD_H1, startTime, endTime, rates);
+   int totalBars = iBars("BTCUSD", PERIOD_H1);
+   Print("Total bars available: ", totalBars);
+   
+   if(totalBars <= 0) {
+      Print("No bars available");
+      FileClose(fileHandle);
+      return;
+   }
+   
+   int copyCount = MathMin(InpBarsToCopy, totalBars);
+   int copied = CopyRates("BTCUSD", PERIOD_H1, 0, copyCount, rates);
    
    if(copied <= 0) {
       Print("Failed to copy rates: ", GetLastError());
@@ -50,5 +56,5 @@ void OnStart() {
    
    FileClose(fileHandle);
    
-   Print("Successfully written ", copied, " rows to ", filename);
+   Print("Written ", copied, " rows to ", filename);
 }
