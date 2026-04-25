@@ -3,11 +3,13 @@
 #property script_show_inputs
 
 input int InpBarsToCopy = 30000;
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;
+input string InpOutputFile = "data.csv";
 
 void OnStart() {
    Print("Fetching crypto OHLC data...");
    
-   string filename = "data.csv";
+   string filename = InpOutputFile;
    int fileHandle = FileOpen(filename, FILE_CSV|FILE_WRITE, ",");
    
    if(fileHandle == INVALID_HANDLE) {
@@ -29,14 +31,14 @@ void OnStart() {
       MqlRates rates[];
       ArraySetAsSeries(rates, true);
 
-      int totalBars = iBars(symbol, PERIOD_H1);
+      int totalBars = iBars(symbol, InpTimeframe);
       if(totalBars <= 0) {
          Print("No bars available for ", symbol);
          continue;
       }
 
       int copyCount = MathMin(InpBarsToCopy, totalBars);
-      int copied = CopyRates(symbol, PERIOD_H1, 0, copyCount, rates);
+      int copied = CopyRates(symbol, InpTimeframe, 0, copyCount, rates);
       if(copied <= 0) {
          Print("Failed to copy rates for ", symbol, ": ", GetLastError());
          continue;

@@ -13,25 +13,25 @@ timeframe_minutes: 60
 sequence_length: 45
 n_ahead: 9
 feature_symbols:
-  BCHUSD: true
+  BCHUSD: false
   BTCUSD: true
-  ETHUSD: true
-  LTCUSD: true
-  XRPUSD: true
-  ADAUSD: true
-  AVAXUSD: true
-  AXSUSD: true
-  DOGEUSD: true
-  DOTUSD: true
-  EOSUSD: true
-  FILUSD: true
-  LINKUSD: true
-  MATICUSD: true
-  MIOTAUSD: true
-  SOLUSD: true
-  TRXUSD: true
-  UNIUSD: true
-  XLMUSD: true
+  ETHUSD: false
+  LTCUSD: false
+  XRPUSD: false
+  ADAUSD: false
+  AVAXUSD: false
+  AXSUSD: false
+  DOGEUSD: false
+  DOTUSD: false
+  EOSUSD: false
+  FILUSD: false
+  LINKUSD: false
+  MATICUSD: false
+  MIOTAUSD: false
+  SOLUSD: false
+  TRXUSD: false
+  UNIUSD: false
+  XLMUSD: false
 start_date: "2020-01-01"
 end_date: "2023-01-01"
 
