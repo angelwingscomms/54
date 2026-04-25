@@ -30,6 +30,7 @@ void OnDeinit(const int reason) {
 void OnTick() {
    datetime barTime = iTime(gSymbol, PERIOD_CURRENT, 0);
    if(barTime == lastBar) return;
+   Print("New bar detected: ", barTime);
    lastBar = barTime;
    RunModel();
 }
@@ -37,6 +38,8 @@ void OnTick() {
 void RunModel() {
    int numCandles = CFG_SEQUENCE_LENGTH;
    matrixf x(numCandles, 4);
+   double price0 = iClose(gSymbol, PERIOD_CURRENT, numCandles - 1);
+   double price1 = iClose(gSymbol, PERIOD_CURRENT, 0);
    for(int i = 0; i < numCandles; i++) {
       int bar = numCandles - 1 - i;
       x[i, 0] = (float)iOpen(gSymbol, PERIOD_CURRENT, bar);
@@ -52,10 +55,12 @@ void RunModel() {
          x[i, f] = (float)((x[i, f] - NORM_MIN[f]) / range);
    }
 
+   Print("prices: oldest=", price0, " latest=", price1, " norm_min=", NORM_MIN[0], " norm_max=", NORM_MAX[0]);
    vectorf y(1);
-   matrixf x3d = x;
-   x3d.Resize(1, 180);
+   matrixf x3d(1, 45, 4);
+   x3d = x;
    if(!OnnxRun(gOnnxHandle, 0, x3d, y)) { Print("ONNX run failed: ", GetLastError()); return; }
+   Print("pred=", y[0]);
    Trade((double)y[0]);
 }
 
