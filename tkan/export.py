@@ -1,3 +1,4 @@
+import jax
 from jax2onnx import to_onnx
 import jax.numpy as jnp
 

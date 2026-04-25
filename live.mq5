@@ -2,8 +2,8 @@
 #property version "1.00"
 #property strict
 
-#include <config.mqh>
-#include <norm_params.mqh>
+#include "config.mqh"
+#include "norm_params.mqh"
 
 input double LotSize = 0.01;
 
