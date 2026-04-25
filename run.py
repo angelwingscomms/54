@@ -12,11 +12,10 @@ from jax2onnx import to_onnx
 jax.default_backend = 'cpu'
 
 
-def load_data(path='examples/data.parquet', tp_pct=3.0, tolerance=0.2, horizon=24):
-    df = pd.read_parquet(path)
-    df = df[(df.index >= pd.Timestamp('2021-06-01')) & (df.index < pd.Timestamp('2021-07-01'))]
+def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24):
+    df = pd.read_csv(path, index_col=0, parse_dates=True)
     
-    btc = df[['BTC open', 'BTC high', 'BTC low', 'BTC close']].copy()
+    btc = df[['open', 'high', 'low', 'close']].copy()
     
     sl_pct = -tp_pct * tolerance
     
