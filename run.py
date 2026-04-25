@@ -104,10 +104,6 @@ def main():
     input_dim = X_tr.shape[-1]
     
     key = jax.random.key(42)
-    n_train = len(X_tr) // 10
-    X_tr_small = X_tr[:n_train]
-    y_tr_small = y_tr[:n_train]
-    
     print("\n=== TKAN ===")
     key, k = jax.random.split(key)
     tkan_p = init_tkan(input_dim, hidden, sub, k)
@@ -116,38 +112,53 @@ def main():
     opt = optax.adam(1e-3)
     opt_st = opt.init(tkan_p)
     
+    def bce_loss(params, x, y):
+        preds = tkan_apply(params, x)
+        eps = 1e-8
+        return -jnp.mean(y * jnp.log(preds + eps) + (1 - y) * jnp.log(1 - preds + eps))
+
+    def eval_loss(params, x, y, batch_size=128):
+        total, count = 0.0, 0
+        for i in range(0, len(x), batch_size):
+            bx, by = x[i:i+batch_size], y[i:i+batch_size]
+            total += float(bce_loss(params, bx, by))
+            count += 1
+        return total / count if count > 0 else 0.0
+
     start = time.time()
+    train_losses, val_losses = [], []
     for ep in range(10):
         idx = jax.random.permutation(jax.random.key(ep), len(X_tr))
         ep_loss = 0
         for i in range(0, len(X_tr), 128):
             b_idx = idx[i:i+128]
             bx, by = X_tr[b_idx], y_tr[b_idx]
-            
-            def loss_fn(p):
-                preds = tkan_apply(p, bx)
-                eps = 1e-8
-                loss = -jnp.mean(by * jnp.log(preds + eps) + (1 - by) * jnp.log(1 - preds + eps))
-                return loss
-            
-            l, g = jax.value_and_grad(loss_fn)(tkan_p)
+            l, g = jax.value_and_grad(bce_loss)(tkan_p, bx, by)
             u, opt_st = opt.update(g, opt_st)
             tkan_p = optax.apply_updates(tkan_p, u)
             ep_loss += l
-        
+        num_batches = len(range(0, len(X_tr), 128))
+        train_loss = float(ep_loss) / num_batches
+        val_loss = eval_loss(tkan_p, X_te, y_te)
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
         if (ep+1) % 2 == 0:
-            print(f"  Epoch {ep+1}: loss = {ep_loss:.4f}")
+            print(f"  Epoch {ep+1}: train={train_loss:.4f}  val={val_loss:.4f}")
     
     tkan_time = time.time() - start
     preds = tkan_apply(tkan_p, X_te)
     acc = jnp.mean((preds > 0.5) == y_te)
     print(f"Time: {tkan_time:.1f}s, Accuracy: {acc:.4f}")
     
-    print("\n" + "="*40)
+    print("\n" + "="*48)
     print("SUMMARY")
-    print("="*40)
-    print(f"TKAN: {tkan_time:.1f}s")
-    print("="*40)
+    print("="*48)
+    print(f"{'Epoch':>6} | {'Train':>8} | {'Val':>8}")
+    print("-"*48)
+    for i, (tl, vl) in enumerate(zip(train_losses, val_losses)):
+        print(f"{i+1:>6} | {tl:>8.4f} | {vl:>8.4f}")
+    print("="*48)
+    print(f"TKAN time: {tkan_time:.1f}s  Final val_acc: {acc:.4f}")
 
 if __name__ == '__main__':
     main()
