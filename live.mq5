@@ -31,6 +31,17 @@ int OnInit() {
       Print("CFG_INPUT_DIM mismatch: expected ", gFeatureCount * 4, " got ", CFG_INPUT_DIM);
       return INIT_FAILED;
    }
+   if(ArraySize(NORM_MIN) != CFG_INPUT_DIM || ArraySize(NORM_MAX) != CFG_INPUT_DIM) {
+      Print(
+         "NORM/config mismatch. Re-train and recompile live.mq5. CFG_INPUT_DIM=",
+         CFG_INPUT_DIM,
+         " NORM_MIN=",
+         ArraySize(NORM_MIN),
+         " NORM_MAX=",
+         ArraySize(NORM_MAX)
+      );
+      return INIT_FAILED;
+   }
    for(int i = 0; i < gFeatureCount; i++)
       SymbolSelect(gFeatureSymbols[i], true);
 

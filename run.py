@@ -157,9 +157,12 @@ def main():
     to_onnx_model(params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub)
     print(f"Model saved to: model.onnx")
     model_path = Path('model.onnx')
+    config_path = Path('config.mqh')
+    norm_path = Path('norm_params.mqh')
     expert_path = Path('live.ex5')
-    if not expert_path.exists() or expert_path.stat().st_mtime < model_path.stat().st_mtime:
-        print("live.ex5 is older than model.onnx. Recompile live.mq5 in MetaEditor before running the tester.")
+    latest_input = max(path.stat().st_mtime for path in (model_path, config_path, norm_path))
+    if not expert_path.exists() or expert_path.stat().st_mtime < latest_input:
+        print("live.ex5 is older than model.onnx/config.mqh/norm_params.mqh. Recompile live.mq5 in MetaEditor before running the tester.")
 
 
 if __name__ == '__main__':
