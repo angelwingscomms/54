@@ -16,12 +16,7 @@ int OnInit() {
    gSymbol = CFG_SYMBOL;
    if(StringLen(gSymbol) == 0) gSymbol = "BTCUSD";
    
-   string commonPath = TerminalInfoString(TERMINAL_DATA_PATH);
-   string modelPath = commonPath + "\\MQL5\\Experts\\TKAN\\model.onnx";
-   
-   uchar ExtModel[];
-   if(FileLoad(modelPath, ExtModel) <= 0) { Print("Failed to load model: ", modelPath); return INIT_FAILED; }
-   gOnnxHandle = OnnxCreateFromBuffer(ExtModel, ONNX_DEFAULT);
+   gOnnxHandle = OnnxCreate("model", ONNX_DEFAULT);
    if(gOnnxHandle == INVALID_HANDLE) { Print("ONNX create failed: ", GetLastError()); return INIT_FAILED; }
    return INIT_SUCCEEDED;
 }
