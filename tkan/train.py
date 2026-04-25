@@ -7,7 +7,7 @@ from .tkan_apply import tkan_apply
 from .loss import bce_loss, eval_loss
 
 
-def train(X_tr, y_tr, X_te, y_te, input_dim, hidden=100, sub=20, epochs=27, lr=1e-3):
+def train(X_tr, y_tr, X_va, y_va, input_dim, hidden=100, sub=20, epochs=27, lr=1e-3):
     key = jax.random.key(42)
     key, k = jax.random.split(key)
     params = init_tkan(input_dim, hidden, sub, k)
@@ -40,12 +40,12 @@ def train(X_tr, y_tr, X_te, y_te, input_dim, hidden=100, sub=20, epochs=27, lr=1
             ep_loss += l
 
         train_loss = float(ep_loss) / num_batches
-        val_loss = eval_loss(params, X_te, y_te)
+        val_loss = eval_loss(params, X_va, y_va)
         
         train_preds = tkan_apply(params, X_tr)
         train_acc = float(jnp.mean((train_preds > 0.5) == y_tr))
-        val_preds = tkan_apply(params, X_te)
-        val_acc = float(jnp.mean((val_preds > 0.5) == y_te))
+        val_preds = tkan_apply(params, X_va)
+        val_acc = float(jnp.mean((val_preds > 0.5) == y_va))
         
         train_losses.append(train_loss)
         val_losses.append(val_loss)
@@ -56,8 +56,8 @@ def train(X_tr, y_tr, X_te, y_te, input_dim, hidden=100, sub=20, epochs=27, lr=1
         print(f"Epoch {ep+1}/{epochs} [{pct}%] | train: {train_loss:.4f} ({100*train_acc:.1f}%) | val: {val_loss:.4f} ({100*val_acc:.1f}%) | ETA: {eta:.0f}s")
 
     elapsed = time.time() - start
-    preds = tkan_apply(params, X_te)
-    acc = jnp.mean((preds > 0.5) == y_te)
-    print(f"Time: {elapsed:.1f}s, Accuracy: {acc:.4f}")
+    preds = tkan_apply(params, X_va)
+    acc = jnp.mean((preds > 0.5) == y_va)
+    print(f"Time: {elapsed:.1f}s, Validation Accuracy: {acc:.4f}")
 
     return params, train_losses, val_losses, acc, elapsed

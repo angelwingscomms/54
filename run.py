@@ -1,14 +1,11 @@
 import os
 os.environ['JAX_CPU_COLLECTIVE_IMPL_HEADER_ONLY'] = '1'
 
-import yaml
 import jax
 import jax.numpy as jnp
-import numpy as np
-import pandas as pd
 from tkan import (
     load_config, load_csv, compute_atr, build_samples,
-    normalize, save_norm_params, save_config, to_onnx_model, train
+    normalize, save_norm_params, save_config, to_onnx_model, train, eval_loss, tkan_apply
 )
 
 jax.default_backend = 'cpu'
@@ -20,6 +17,7 @@ def main():
     print("#"*60 + "\n")
 
     cfg = load_config()
+    seq_len = cfg['sequence_length']
 
     print("\n" + "="*50)
     print("LOADING DATA")
@@ -46,9 +44,10 @@ def main():
     atr = compute_atr(btc, cfg['atr_period'])
     print(f"  ATR computed, first valid ATR at index: {atr.first_valid_index()}")
 
-    print(f"\n  Building training samples (sequence_length=45, horizon={cfg['n_ahead']})...")
+    print(f"\n  Building training samples (sequence_length={seq_len}, horizon={cfg['n_ahead']})...")
     X_arr, y_arr = build_samples(
         btc, atr,
+        sequence_length=seq_len,
         horizon=cfg['n_ahead'],
         tp_pct=cfg['threshold_pct'],
         tolerance=cfg['stop_loss_pct'],
@@ -67,14 +66,28 @@ def main():
     print("="*50 + "\n")
 
     print("\n" + "-"*50)
-    print("SPLITTING DATA (80% train / 20% test)")
+    print("SPLITTING DATA (TRAIN / VAL / TEST WITH PURGE GAP)")
     print("-"*50)
-    sep = int(len(X_arr) * 0.8)
-    gap = cfg['n_ahead']
-    X_tr, X_te = X_arr[:sep], X_arr[sep + gap:]
-    y_tr, y_te = y_arr[:sep], y_arr[sep + gap:]
+    split = cfg['train_test_split']
+    gap = seq_len + cfg['n_ahead']
+    if not 0 < split < 1:
+        raise ValueError("train_test_split must be between 0 and 1.")
+    usable = len(X_arr) - 2 * gap
+    if usable <= 0:
+        raise ValueError("Not enough samples for a purged train/val/test split. Add more data or reduce sequence_length/horizon.")
+    train_n = int(usable * split)
+    val_n = (usable - train_n) // 2
+    test_n = usable - train_n - val_n
+    val_start = train_n + gap
+    test_start = val_start + val_n + gap
+    X_tr, X_va, X_te = X_arr[:train_n], X_arr[val_start:val_start + val_n], X_arr[test_start:test_start + test_n]
+    y_tr, y_va, y_te = y_arr[:train_n], y_arr[val_start:val_start + val_n], y_arr[test_start:test_start + test_n]
+    if min(len(X_tr), len(X_va), len(X_te)) == 0:
+        raise ValueError("Not enough samples for a purged train/val/test split. Add more data or reduce sequence_length/horizon.")
     print(f"  Training samples:   {len(X_tr)}")
+    print(f"  Validation samples:{len(X_va)}")
     print(f"  Test samples:      {len(X_te)}")
+    print(f"  Purge gap:         {gap}")
 
     print("\n" + "-"*50)
     print("NORMALIZING DATA")
@@ -82,17 +95,21 @@ def main():
     xmin, xmax = X_tr.min(axis=(0, 1), keepdims=True), X_tr.max(axis=(0, 1), keepdims=True)
     print(f"  X_min range: [{xmin.min():.4f}, {xmin.max():.4f}]")
     print(f"  X_max range: [{xmax.min():.4f}, {xmax.max():.4f}]")
-    X_tr, X_te, y_tr, y_te = normalize(xmin, xmax, X_tr, X_te, y_tr, y_te)
+    X_tr, X_va, X_te, y_tr, y_va, y_te = normalize(xmin, xmax, X_tr, X_va, X_te, y_tr, y_va, y_te)
     print("  Normalization applied!")
 
     X_tr = jnp.array(X_tr)
     y_tr = jnp.array(y_tr)
+    X_va = jnp.array(X_va)
+    y_va = jnp.array(y_va)
     X_te = jnp.array(X_te)
     y_te = jnp.array(y_te)
 
     print(f"\n  Converted to JAX arrays:")
     print(f"    X_train: {X_tr.shape}")
     print(f"    y_train: {y_tr.shape}")
+    print(f"    X_val:   {X_va.shape}")
+    print(f"    y_val:   {y_va.shape}")
     print(f"    X_test:  {X_te.shape}")
     print(f"    y_test:  {y_te.shape}")
     print("-"*50 + "\n")
@@ -101,9 +118,12 @@ def main():
     input_dim = X_tr.shape[-1]
 
     print("\n=== TKAN ===")
-    params, train_losses, val_losses, acc, elapsed = train(
-        X_tr, y_tr, X_te, y_te, input_dim, hidden, sub, epochs=cfg['epochs'], lr=cfg['learning_rate']
+    params, train_losses, val_losses, val_acc, elapsed = train(
+        X_tr, y_tr, X_va, y_va, input_dim, hidden, sub, epochs=cfg['epochs'], lr=cfg['learning_rate']
     )
+    test_loss = float(eval_loss(params, X_te, y_te))
+    test_preds = tkan_apply(params, X_te)
+    test_acc = float(jnp.mean((test_preds > 0.5) == y_te))
 
     print("\n" + "="*48)
     print("SUMMARY")
@@ -113,7 +133,7 @@ def main():
     for i, (tl, vl) in enumerate(zip(train_losses, val_losses)):
         print(f"{i+1:>6} | {tl:>8.4f} | {vl:>8.4f}")
     print("="*48)
-    print(f"TKAN time: {elapsed:.1f}s  Final val_acc: {acc:.4f}")
+    print(f"TKAN time: {elapsed:.1f}s  Final val_acc: {val_acc:.4f}  Test loss: {test_loss:.4f}  Test acc: {test_acc:.4f}")
 
     save_norm_params(xmin, xmax)
     save_config(cfg)

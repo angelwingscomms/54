@@ -1,4 +1,3 @@
-import pandas as pd
 import numpy as np
 
 
@@ -15,11 +14,11 @@ def compute_atr(btc, period=9):
     return atr
 
 
-def build_samples(btc, atr, horizon, tp_pct, tolerance,
+def build_samples(btc, atr, sequence_length, horizon, tp_pct, tolerance,
                  target_type, atr_multiplier, tp_multiplier):
     X, y = [], []
-    for i in range(45, len(btc) - horizon):
-        X.append(btc.iloc[i - 45:i].values)
+    for i in range(sequence_length, len(btc) - horizon):
+        X.append(btc.iloc[i - sequence_length:i].values)
 
         close = btc.iloc[i]['close']
 
