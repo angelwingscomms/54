@@ -21,20 +21,14 @@ def load_data(path='examples/data.parquet', assets=None):
     X, y = [], []
     for i in range(45, len(df) - 1):
         X.append(df.iloc[i - 45:i].values)
-        y.append(df.iloc[i:i + 1, 0:1].values)
-    return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
+        y.append(1.0 if df.iloc[i + 1, 0] > df.iloc[i, 0] else 0.0)
+    return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32).reshape(-1, 1)
 
 
 def normalize(X_tr, X_te, y_tr, y_te):
     xmin, xmax = X_tr.min(axis=(0, 1), keepdims=True), X_tr.max(axis=(0, 1), keepdims=True)
     X_tr = (X_tr - xmin) / (xmax - xmin + 1e-8)
     X_te = (X_te - xmin) / (xmax - xmin + 1e-8)
-    
-    ymin, ymax = y_tr.min(), y_tr.max()
-    y_tr = (y_tr - ymin) / (ymax - ymin + 1e-8)
-    y_te = (y_te - ymin) / (ymax - ymin + 1e-8)
-    y_tr.shape = (len(y_tr), -1)
-    y_te.shape = (len(y_te), -1)
     return X_tr, X_te, y_tr, y_te
 
 
@@ -83,7 +77,7 @@ def tkan_fwd(params, x, hidden=100, sub=20):
 
 
 def tkan_apply(params, x, hidden=100):
-    return jnp.dot(tkan_fwd(params, x, hidden), params['dense_w']) + params['dense_b']
+    return jax.nn.sigmoid(jnp.dot(tkan_fwd(params, x, hidden), params['dense_w']) + params['dense_b'])
 
 
 
@@ -135,7 +129,10 @@ def main():
             bx, by = X_tr[b_idx], y_tr[b_idx]
             
             def loss_fn(p):
-                return jnp.mean((tkan_apply(p, bx) - by) ** 2)
+                preds = tkan_apply(p, bx)
+                eps = 1e-8
+                loss = -jnp.mean(by * jnp.log(preds + eps) + (1 - by) * jnp.log(1 - preds + eps))
+                return loss
             
             l, g = jax.value_and_grad(loss_fn)(tkan_p)
             u, opt_st = opt.update(g, opt_st)
@@ -147,8 +144,8 @@ def main():
     
     tkan_time = time.time() - start
     preds = tkan_apply(tkan_p, X_te)
-    rmse = jnp.sqrt(jnp.mean((y_te - preds) ** 2))
-    print(f"Time: {tkan_time:.1f}s, RMSE: {rmse:.4f}")
+    acc = jnp.mean((preds > 0.5) == y_te)
+    print(f"Time: {tkan_time:.1f}s, Accuracy: {acc:.4f}")
     
     print("\n" + "="*40)
     print("SUMMARY")
