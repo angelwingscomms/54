@@ -12,10 +12,21 @@ from jax2onnx import to_onnx
 jax.default_backend = 'cpu'
 
 
-def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24):
+def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
+               target_type='atr', atr_multiplier=2.0, tp_multiplier=2.0, atr_period=14):
     df = pd.read_csv(path, index_col=0, parse_dates=True)
     
     btc = df[['open', 'high', 'low', 'close']].copy()
+    
+    prev_close = btc['BTC close'].shift(1)
+    tr = np.maximum(
+        btc['BTC high'] - btc['BTC low'],
+        np.maximum(
+            np.abs(btc['BTC high'] - prev_close),
+            np.abs(btc['BTC low'] - prev_close)
+        )
+    )
+    atr = tr.rolling(window=atr_period).mean()
     
     sl_pct = -tp_pct * tolerance
     
@@ -24,8 +35,15 @@ def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24):
         X.append(btc.iloc[i - 45:i].values)
         
         close = btc.iloc[i]['BTC close']
-        tp_price = close * (1 + tp_pct / 100)
-        sl_price = close * (1 + sl_pct / 100)
+        
+        if target_type == 'atr':
+            atr_val = atr.iloc[i]
+            sl_distance = atr_val * atr_multiplier
+            sl_price = close - sl_distance
+            tp_price = close + (sl_distance * tp_multiplier)
+        else:
+            tp_price = close * (1 + tp_pct / 100)
+            sl_price = close * (1 + sl_pct / 100)
         
         tp_idx = sl_idx = None
         for j in range(1, horizon + 1):
