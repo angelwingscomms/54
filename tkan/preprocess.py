@@ -14,35 +14,51 @@ def compute_atr(ohlc, period=9):
     return atr
 
 
+def _resolve_trade(future, tp_price, sl_price, is_buy):
+    for row in future.itertuples(index=False):
+        tp_hit = row.high >= tp_price if is_buy else row.low <= tp_price
+        sl_hit = row.low <= sl_price if is_buy else row.high >= sl_price
+        if tp_hit and sl_hit:
+            return 'ambiguous'
+        if tp_hit:
+            return 'tp'
+        if sl_hit:
+            return 'sl'
+    return None
+
+
 def build_samples(features, target, atr, sequence_length, horizon, tp_pct, tolerance,
                  target_type, atr_multiplier, tp_multiplier):
     X, y = [], []
     for i in range(sequence_length, len(features) - horizon):
-        X.append(features.iloc[i - sequence_length:i].values)
-
-        close = target.iloc[i]['close']
+        close = float(target.iloc[i]['close'])
 
         if target_type == 'atr':
-            atr_val = atr.iloc[i]
+            atr_val = float(atr.iloc[i])
+            if not np.isfinite(atr_val) or atr_val <= 0:
+                continue
             sl_distance = atr_val * atr_multiplier
-            sl_price = close - sl_distance
-            tp_price = close + (sl_distance * tp_multiplier)
+            tp_distance = sl_distance * tp_multiplier
         else:
-            tp_price = close * (1 + tp_pct / 100)
-            sl_price = close * (1 + tolerance / 100)
+            tp_distance = close * (tp_pct / 100.0)
+            sl_distance = close * ((tp_pct * tolerance) / 100.0)
 
-        sl_pct = -tp_pct * tolerance
-        tp_idx = sl_idx = None
-        for j in range(1, horizon + 1):
-            high = target.iloc[i + j]['high']
-            low = target.iloc[i + j]['low']
-            if tp_idx is None and high >= tp_price:
-                tp_idx = j
-            if sl_idx is None and low <= sl_price:
-                sl_idx = j
-            if tp_idx and sl_idx:
-                break
+        if tp_distance <= 0 or sl_distance <= 0:
+            continue
 
-        y.append(1.0 if tp_idx and (sl_idx is None or tp_idx < sl_idx) else 0.0)
+        future = target.iloc[i + 1:i + horizon + 1]
+        long_result = _resolve_trade(future, close + tp_distance, close - sl_distance, True)
+        short_result = _resolve_trade(future, close - tp_distance, close + sl_distance, False)
+
+        if 'ambiguous' in (long_result, short_result):
+            continue
+
+        long_win = long_result == 'tp'
+        short_win = short_result == 'tp'
+        if long_win == short_win:
+            continue
+
+        X.append(features.iloc[i - sequence_length:i].values)
+        y.append(1.0 if long_win else 0.0)
 
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32).reshape(-1, 1)

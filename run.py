@@ -68,13 +68,18 @@ def main():
         tp_multiplier=cfg['tp_multiplier']
     )
 
-    pos_count = int(y_arr.sum())
-    neg_count = len(y_arr) - pos_count
-    print(f"\n  Done! Generated {len(X_arr)} samples")
+    total_candidates = max(0, len(features) - seq_len - cfg['n_ahead'])
+    buy_count = int(y_arr.sum())
+    sell_count = len(y_arr) - buy_count
+    dropped_count = total_candidates - len(X_arr)
+    if len(X_arr) == 0:
+        raise ValueError("No clean labeled samples were produced. Too many windows were dropped as ambiguous or unresolved.")
+    print(f"\n  Done! Generated {len(X_arr)} clean samples")
     print(f"    - X shape: {X_arr.shape}")
     print(f"    - y shape: {y_arr.shape}")
-    print(f"    - Positive (TP hit): {pos_count} ({100*pos_count/len(y_arr):.1f}%)")
-    print(f"    - Negative (SL hit): {neg_count} ({100*neg_count/len(y_arr):.1f}%)")
+    print(f"    - Buy labels:  {buy_count} ({100*buy_count/len(y_arr):.1f}%)")
+    print(f"    - Sell labels: {sell_count} ({100*sell_count/len(y_arr):.1f}%)")
+    print(f"    - Dropped windows: {dropped_count}")
     print("="*50 + "\n")
 
     print("\n" + "-"*50)
