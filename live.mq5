@@ -47,8 +47,7 @@ void RunModel() {
          x[i, f] = (float)((x[i, f] - NORM_MIN[f]) / range);
    }
 
-   matrixf x3d[1];
-   x3d[0] = x;
+   matrixf x3d = x.Reshape(1, NumCandles * 4);
    vectorf y(1);
    if(!OnnxRun(OnnxHandle, 0, x3d, y)) { Print("ONNX run failed: ", GetLastError()); return; }
    Trade((double)y[0]);

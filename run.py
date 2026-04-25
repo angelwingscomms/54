@@ -44,11 +44,10 @@ def load_data(path='examples/data.parquet', tp_pct=3.0, tolerance=0.2, horizon=2
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32).reshape(-1, 1)
 
 
-def normalize(X_tr, X_te, y_tr, y_te):
-    xmin, xmax = X_tr.min(axis=(0, 1), keepdims=True), X_tr.max(axis=(0, 1), keepdims=True)
+def normalize(xmin, xmax, X_tr, X_te, y_tr, y_te):
     X_tr = (X_tr - xmin) / (xmax - xmin + 1e-8)
     X_te = (X_te - xmin) / (xmax - xmin + 1e-8)
-    return X_tr, X_te, y_tr, y_te, xmin, xmax
+    return X_tr, X_te, y_tr, y_te
 
 
 def save_norm_params(xmin, xmax):
