@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 from .tkan_cell import tkan_cell
 

@@ -1,3 +1,5 @@
+import yaml
+
 DEFAULTS = {
     'symbol': 'BTC',
     'target_type': 'atr',

@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 from .tkan_forward import tkan_fwd
 
