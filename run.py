@@ -70,8 +70,9 @@ def main():
     print("SPLITTING DATA (80% train / 20% test)")
     print("-"*50)
     sep = int(len(X_arr) * 0.8)
-    X_tr, X_te = X_arr[:sep], X_arr[sep:]
-    y_tr, y_te = y_arr[:sep], y_arr[sep:]
+    gap = cfg['n_ahead']
+    X_tr, X_te = X_arr[:sep], X_arr[sep + gap:]
+    y_tr, y_te = y_arr[:sep], y_arr[sep + gap:]
     print(f"  Training samples:   {len(X_tr)}")
     print(f"  Test samples:      {len(X_te)}")
 
