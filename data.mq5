@@ -5,62 +5,65 @@
 input int InpBarsToCopy = 30000;
 
 void OnStart() {
-   Print("Fetching BTCUSD data...");
+   Print("Fetching crypto OHLC data...");
    
    string filename = "data.csv";
-   int fileHandle = FileOpen(filename, FILE_CSV|FILE_WRITE|FILE_ANSI, ",");
+   int fileHandle = FileOpen(filename, FILE_CSV|FILE_WRITE, ",");
    
    if(fileHandle == INVALID_HANDLE) {
       Print("Failed to open file: ", GetLastError());
       return;
    }
    
-   FileWrite(fileHandle, "datetime,open,high,low,close");
-   
-   MqlRates rates[];
-   ArraySetAsSeries(rates, true);
-   
-   int totalBars = iBars("BTCUSD", PERIOD_H1);
-   Print("Total bars available: ", totalBars);
-   
-   if(totalBars <= 0) {
-      Print("No bars available");
-      FileClose(fileHandle);
-      return;
-   }
-   
-   int copyCount = MathMin(InpBarsToCopy, totalBars);
-   Print("Requesting ", copyCount, " bars...");
-   
-   int copied = CopyRates("BTCUSD", PERIOD_H1, 0, copyCount, rates);
-   
-   if(copied <= 0) {
-      Print("Failed to copy rates: ", GetLastError());
-      FileClose(fileHandle);
-      return;
-   }
-   
-   if(copied < InpBarsToCopy) {
-      Print("Warning: Requested ", InpBarsToCopy, " but only got ", copied, " bars");
-   }
-   
-   Print("Copied ", copied, " bars");
-   
-   for(int i = 0; i < copied; i++) {
-      string dtStr = TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES);
-      StringReplace(dtStr, ".", "-");
-      StringReplace(dtStr, ":", "-");
-      
-      string line = dtStr + "," +
-                  DoubleToString(rates[i].open, 2) + "," +
-                  DoubleToString(rates[i].high, 2) + "," +
-                  DoubleToString(rates[i].low, 2) + "," +
-                  DoubleToString(rates[i].close, 2);
-      
-      FileWrite(fileHandle, line);
+   FileWrite(fileHandle, "datetime", "symbol", "open", "high", "low", "close");
+
+   string symbolsText = "BCHUSD,BTCUSD,ETHUSD,LTCUSD,XRPUSD,ADAUSD,AVAXUSD,AXSUSD,DOGEUSD,DOTUSD,EOSUSD,FILUSD,LINKUSD,MATICUSD,MIOTAUSD,SOLUSD,TRXUSD,UNIUSD,XLMUSD";
+   string symbols[];
+   int symbolCount = StringSplit(symbolsText, ',', symbols);
+   int totalRows = 0;
+
+   for(int s = 0; s < symbolCount; s++) {
+      string symbol = symbols[s];
+      SymbolSelect(symbol, true);
+
+      MqlRates rates[];
+      ArraySetAsSeries(rates, true);
+
+      int totalBars = iBars(symbol, PERIOD_H1);
+      if(totalBars <= 0) {
+         Print("No bars available for ", symbol);
+         continue;
+      }
+
+      int copyCount = MathMin(InpBarsToCopy, totalBars);
+      int copied = CopyRates(symbol, PERIOD_H1, 0, copyCount, rates);
+      if(copied <= 0) {
+         Print("Failed to copy rates for ", symbol, ": ", GetLastError());
+         continue;
+      }
+
+      int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+      for(int i = 0; i < copied; i++) {
+         string dtStr = TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES);
+         StringReplace(dtStr, ".", "-");
+         StringReplace(dtStr, ":", "-");
+
+         FileWrite(
+            fileHandle,
+            dtStr,
+            symbol,
+            DoubleToString(rates[i].open, digits),
+            DoubleToString(rates[i].high, digits),
+            DoubleToString(rates[i].low, digits),
+            DoubleToString(rates[i].close, digits)
+         );
+      }
+
+      totalRows += copied;
+      Print("Written ", copied, " rows for ", symbol);
    }
    
    FileClose(fileHandle);
    
-   Print("Written ", copied, " rows to ", filename);
+   Print("Written ", totalRows, " rows to ", filename);
 }

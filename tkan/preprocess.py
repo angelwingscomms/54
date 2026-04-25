@@ -1,26 +1,26 @@
 import numpy as np
 
 
-def compute_atr(btc, period=9):
-    prev_close = btc['close'].shift(1)
+def compute_atr(ohlc, period=9):
+    prev_close = ohlc['close'].shift(1)
     tr = np.maximum(
-        btc['high'] - btc['low'],
+        ohlc['high'] - ohlc['low'],
         np.maximum(
-            np.abs(btc['high'] - prev_close),
-            np.abs(btc['low'] - prev_close)
+            np.abs(ohlc['high'] - prev_close),
+            np.abs(ohlc['low'] - prev_close)
         )
     )
     atr = tr.rolling(window=period).mean()
     return atr
 
 
-def build_samples(btc, atr, sequence_length, horizon, tp_pct, tolerance,
+def build_samples(features, target, atr, sequence_length, horizon, tp_pct, tolerance,
                  target_type, atr_multiplier, tp_multiplier):
     X, y = [], []
-    for i in range(sequence_length, len(btc) - horizon):
-        X.append(btc.iloc[i - sequence_length:i].values)
+    for i in range(sequence_length, len(features) - horizon):
+        X.append(features.iloc[i - sequence_length:i].values)
 
-        close = btc.iloc[i]['close']
+        close = target.iloc[i]['close']
 
         if target_type == 'atr':
             atr_val = atr.iloc[i]
@@ -34,8 +34,8 @@ def build_samples(btc, atr, sequence_length, horizon, tp_pct, tolerance,
         sl_pct = -tp_pct * tolerance
         tp_idx = sl_idx = None
         for j in range(1, horizon + 1):
-            high = btc.iloc[i + j]['high']
-            low = btc.iloc[i + j]['low']
+            high = target.iloc[i + j]['high']
+            low = target.iloc[i + j]['low']
             if tp_idx is None and high >= tp_price:
                 tp_idx = j
             if sl_idx is None and low <= sl_price:

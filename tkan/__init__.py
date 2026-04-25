@@ -1,5 +1,5 @@
 from .config import DEFAULTS, load_config
-from .data import load_csv
+from .data import load_csv, select_feature_frame, select_symbol_ohlc
 from .preprocess import compute_atr, build_samples
 from .normalize import normalize
 from .export import save_norm_params, save_config, to_onnx_model
@@ -14,6 +14,8 @@ __all__ = [
     'DEFAULTS',
     'load_config',
     'load_csv',
+    'select_feature_frame',
+    'select_symbol_ohlc',
     'compute_atr',
     'build_samples',
     'normalize',

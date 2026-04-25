@@ -14,11 +14,26 @@ long gOnnxHandle = INVALID_HANDLE;
 int gAtrHandle = INVALID_HANDLE;
 
 string gSymbol;
+string gFeatureSymbols[];
+int gFeatureCount = 0;
 
 int OnInit() {
    gSymbol = CFG_SYMBOL;
    if(StringLen(gSymbol) == 0) gSymbol = _Symbol;
-   
+   SymbolSelect(gSymbol, true);
+   gFeatureCount = StringSplit(CFG_FEATURE_SYMBOLS, ',', gFeatureSymbols);
+   if(gFeatureCount <= 0) {
+      ArrayResize(gFeatureSymbols, 1);
+      gFeatureSymbols[0] = gSymbol;
+      gFeatureCount = 1;
+   }
+   if(CFG_INPUT_DIM != gFeatureCount * 4) {
+      Print("CFG_INPUT_DIM mismatch: expected ", gFeatureCount * 4, " got ", CFG_INPUT_DIM);
+      return INIT_FAILED;
+   }
+   for(int i = 0; i < gFeatureCount; i++)
+      SymbolSelect(gFeatureSymbols[i], true);
+
 gOnnxHandle = OnnxCreateFromBuffer(ExtModel, ONNX_DEFAULT);
    if(gOnnxHandle == INVALID_HANDLE) { Print("ONNX create failed: ", GetLastError()); return INIT_FAILED; }
    
@@ -37,11 +52,6 @@ void OnDeinit(const int reason) {
 
 void OnTick() {
    datetime barTime = iTime(gSymbol, PERIOD_CURRENT, 0);
-   if(barTime == 0 && gSymbol != _Symbol) {
-      Print("Configured symbol unavailable: ", gSymbol, ". Using chart symbol: ", _Symbol);
-      gSymbol = _Symbol;
-      barTime = iTime(gSymbol, PERIOD_CURRENT, 0);
-   }
    if(barTime == 0) return;
    if(barTime == lastBar) return;
    Print("New bar detected: ", barTime);
@@ -51,18 +61,30 @@ void OnTick() {
 
 void RunModel() {
    int numCandles = CFG_SEQUENCE_LENGTH;
-   matrixf x(numCandles, 4);
+   matrixf x(numCandles, CFG_INPUT_DIM);
    double price0 = iClose(gSymbol, PERIOD_CURRENT, numCandles - 1);
    double price1 = iClose(gSymbol, PERIOD_CURRENT, 0);
    for(int i = 0; i < numCandles; i++) {
       int bar = numCandles - 1 - i;
-      x[i, 0] = (float)iOpen(gSymbol, PERIOD_CURRENT, bar);
-      x[i, 1] = (float)iHigh(gSymbol, PERIOD_CURRENT, bar);
-      x[i, 2] = (float)iLow(gSymbol, PERIOD_CURRENT, bar);
-      x[i, 3] = (float)iClose(gSymbol, PERIOD_CURRENT, bar);
+      int col = 0;
+      for(int s = 0; s < gFeatureCount; s++) {
+         string symbol = gFeatureSymbols[s];
+         double open = iOpen(symbol, PERIOD_CURRENT, bar);
+         double high = iHigh(symbol, PERIOD_CURRENT, bar);
+         double low = iLow(symbol, PERIOD_CURRENT, bar);
+         double close = iClose(symbol, PERIOD_CURRENT, bar);
+         if(open == 0.0 && high == 0.0 && low == 0.0 && close == 0.0) {
+            Print("Missing bar data for ", symbol, " at shift ", bar);
+            return;
+         }
+         x[i, col++] = (float)open;
+         x[i, col++] = (float)high;
+         x[i, col++] = (float)low;
+         x[i, col++] = (float)close;
+      }
    }
 
-   for(int f = 0; f < 4; f++) {
+   for(int f = 0; f < CFG_INPUT_DIM; f++) {
       double range = NORM_MAX[f] - NORM_MIN[f];
       if(range < 1e-8) range = 1e-8;
       for(int i = 0; i < numCandles; i++)
@@ -72,7 +94,7 @@ void RunModel() {
    Print("prices: oldest=", price0, " latest=", price1, " norm_min=", NORM_MIN[0], " norm_max=", NORM_MAX[0]);
    vectorf y(1);
    matrixf x3d = x;
-   x3d.Resize(1, 180);
+   x3d.Resize(1, numCandles * CFG_INPUT_DIM);
    if(!OnnxRun(gOnnxHandle, 0, x3d, y)) { Print("ONNX run failed: ", GetLastError()); return; }
    Print("pred=", y[0]);
    Trade((double)y[0]);

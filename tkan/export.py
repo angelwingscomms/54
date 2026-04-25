@@ -42,6 +42,11 @@ def save_config(cfg):
         else:
             content.append(f'const {mql_type} {name} = {v};')
 
+    feature_symbols = cfg.get('enabled_symbols') or [cfg.get('symbol')]
+    input_dim = cfg.get('input_dim', len(feature_symbols) * 4)
+    content.append(f'const string CFG_FEATURE_SYMBOLS = "{",".join(feature_symbols)}";')
+    content.append(f'const int CFG_INPUT_DIM = {input_dim};')
+
     with open('config.mqh', 'w') as f:
         f.write('\n'.join(content))
     print('Saved config.mqh')
@@ -75,7 +80,7 @@ def make_mql5_compatible(path='model.onnx'):
     has_legacy_input = any(value.name == legacy_name for value in graph.input[1:])
     input_shape = _get_shape(model_input)
 
-    if input_shape == [1, 180] and not has_legacy_input:
+    if input_shape and len(input_shape) == 2 and not has_legacy_input:
         return path
 
     source_shape = input_shape if input_shape and len(input_shape) == 3 else None
@@ -147,7 +152,7 @@ def make_mql5_compatible(path='model.onnx'):
     return path
 
 
-def to_onnx_model(params, hidden=100, sub=20):
+def to_onnx_model(params, sequence_length=45, input_dim=4, hidden=100, sub=20):
     from .tkan_forward import tkan_fwd
 
     def make_apply_fn(params_inner):
@@ -157,7 +162,7 @@ def to_onnx_model(params, hidden=100, sub=20):
 
     result = to_onnx(
         make_apply_fn(params),
-        inputs=[jax.ShapeDtypeStruct((1, 45, 4), jnp.float32)],
+        inputs=[jax.ShapeDtypeStruct((1, sequence_length, input_dim), jnp.float32)],
         model_name='TKAN',
         return_mode='file',
         output_path='model.onnx'

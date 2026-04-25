@@ -1,5 +1,5 @@
 # Symbol
-symbol: "BTC"
+symbol: "BTCUSD"
 
 # Symbol
 target_type: "atr"
@@ -12,7 +12,26 @@ data_path: "data.csv"
 timeframe_minutes: 60
 sequence_length: 45
 n_ahead: 9
-assets: [BTC, ETH, ADA, EOS, MATIC, TRX, XLM, LINK, BCH, LTC]
+feature_symbols:
+  BCHUSD: true
+  BTCUSD: true
+  ETHUSD: true
+  LTCUSD: true
+  XRPUSD: true
+  ADAUSD: true
+  AVAXUSD: true
+  AXSUSD: true
+  DOGEUSD: true
+  DOTUSD: true
+  EOSUSD: true
+  FILUSD: true
+  LINKUSD: true
+  MATICUSD: true
+  MIOTAUSD: true
+  SOLUSD: true
+  TRXUSD: true
+  UNIUSD: true
+  XLMUSD: true
 start_date: "2020-01-01"
 end_date: "2023-01-01"
 

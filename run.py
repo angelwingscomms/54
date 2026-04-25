@@ -5,9 +5,11 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+import pandas as pd
 from tkan import (
     load_config, load_csv, compute_atr, build_samples,
-    normalize, save_norm_params, save_config, to_onnx_model, train, eval_loss, tkan_apply
+    normalize, save_norm_params, save_config, to_onnx_model, train, eval_loss, tkan_apply,
+    select_feature_frame, select_symbol_ohlc,
 )
 
 jax.default_backend = 'cpu'
@@ -33,22 +35,30 @@ def main():
     print(f"    - atr_multiplier: {cfg['atr_multiplier']}")
     print(f"    - tp_multiplier: {cfg['tp_multiplier']}")
     print(f"    - atr_period: {cfg['atr_period']}")
+    print(f"    - target_symbol: {cfg['symbol']}")
+    print(f"    - feature_symbols: {cfg['enabled_symbols']}")
 
     print(f"\n  Loading CSV file...")
     df = load_csv(cfg['data_path'])
     print(f"  CSV loaded: {len(df)} rows")
     print(f"  Columns: {list(df.columns)}")
 
-    btc = df[['open', 'high', 'low', 'close']].copy()
-    print(f"  Extracted OHLC data: {btc.shape}")
+    features = select_feature_frame(df, cfg['enabled_symbols'])
+    target = select_symbol_ohlc(df, cfg['symbol'])
+    merged = pd.concat([features, target.add_prefix('target_')], axis=1).dropna()
+    features = merged[features.columns].copy()
+    target = merged[[f'target_{field}' for field in ('open', 'high', 'low', 'close')]].copy()
+    target.columns = ['open', 'high', 'low', 'close']
+    print(f"  Feature data: {features.shape}")
+    print(f"  Target OHLC: {target.shape}")
 
     print(f"\n  Computing ATR (period={cfg['atr_period']})...")
-    atr = compute_atr(btc, cfg['atr_period'])
+    atr = compute_atr(target, cfg['atr_period'])
     print(f"  ATR computed, first valid ATR at index: {atr.first_valid_index()}")
 
     print(f"\n  Building training samples (sequence_length={seq_len}, horizon={cfg['n_ahead']})...")
     X_arr, y_arr = build_samples(
-        btc, atr,
+        features, target, atr,
         sequence_length=seq_len,
         horizon=cfg['n_ahead'],
         tp_pct=cfg['threshold_pct'],
@@ -137,11 +147,12 @@ def main():
     print("="*48)
     print(f"TKAN time: {elapsed:.1f}s  Final val_acc: {val_acc:.4f}  Test loss: {test_loss:.4f}  Test acc: {test_acc:.4f}")
 
+    cfg['input_dim'] = int(input_dim)
     save_norm_params(xmin, xmax)
     save_config(cfg)
 
     print("\nExporting model to ONNX...")
-    to_onnx_model(params)
+    to_onnx_model(params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub)
     print(f"Model saved to: model.onnx")
     model_path = Path('model.onnx')
     expert_path = Path('live.ex5')
