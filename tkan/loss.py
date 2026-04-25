@@ -1,8 +1,10 @@
 import jax
 import jax.numpy as jnp
+from functools import partial
 from .tkan_apply import tkan_apply
 
 
+@partial(jax.jit)
 def bce_loss(params, x, y):
     preds = tkan_apply(params, x)
     eps = 1e-8

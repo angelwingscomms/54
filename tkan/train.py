@@ -25,6 +25,12 @@ def train(X_tr, y_tr, X_te, y_te, input_dim, hidden=100, sub=20, epochs=27, lr=1
         idx = jax.random.permutation(jax.random.key(ep), len(X_tr))
         ep_loss = 0
         
+        pct = (ep + 1) / epochs
+        bar_len = 20
+        filled = int(bar_len * pct)
+        bar = "█" * filled + "░" * (bar_len - filled)
+        print(f"\rEpoch {ep+1:2d}/{epochs} [{bar}] {pct*100:.1f}%", end="", flush=True)
+        
         for i in range(0, len(X_tr), 128):
             b_idx = idx[i:i+128]
             bx, by = X_tr[b_idx], y_tr[b_idx]

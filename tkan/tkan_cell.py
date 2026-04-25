@@ -1,7 +1,9 @@
 import jax
 import jax.numpy as jnp
+from functools import partial
 
 
+@partial(jax.jit, static_argnames=['hidden', 'sub'])
 def tkan_cell(params, h, c, x, sub_s, hidden=100, sub=20):
     gates = jnp.dot(x, params['wx']) + jnp.dot(h, params['uh']) + params['bias']
     i = jax.nn.sigmoid(gates[:, :hidden])
