@@ -5,6 +5,8 @@
 #include "config.mqh"
 #include "norm_params.mqh"
 
+#resource "\\Experts\\TKAN\\model.onnx" as uchar ExtModel[]
+
 input double LotSize = 0.01;
 
 datetime lastBar = 0;
@@ -16,7 +18,7 @@ int OnInit() {
    gSymbol = CFG_SYMBOL;
    if(StringLen(gSymbol) == 0) gSymbol = "BTCUSD";
    
-   gOnnxHandle = OnnxCreate("model", ONNX_DEFAULT);
+   gOnnxHandle = OnnxCreateFromBuffer(ExtModel, ONNX_DEFAULT);
    if(gOnnxHandle == INVALID_HANDLE) { Print("ONNX create failed: ", GetLastError()); return INIT_FAILED; }
    return INIT_SUCCEEDED;
 }
