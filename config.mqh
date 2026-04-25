@@ -1,4 +1,4 @@
-const string CFG_SYMBOL = "BTC";
+const string CFG_SYMBOL = "BTCUSD";
 const string CFG_TARGET_TYPE = "atr";
 const double CFG_ATR_MULTIPLIER = 2.0;
 const double CFG_TP_MULTIPLIER = 2.0;
