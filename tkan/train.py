@@ -17,7 +17,7 @@ def train(X_tr, y_tr, X_va, y_va, input_dim, hidden=100, sub=20, epochs=27, lr=1
     opt_st = opt.init(params)
 
     start = time.time()
-    train_losses, val_losses = [], []
+    train_losses, val_losses, train_accs, val_accs = [], [], [], []
     num_batches = len(range(0, len(X_tr), 128))
     best_params = params
     best_val_loss = float('inf')
@@ -26,12 +26,6 @@ def train(X_tr, y_tr, X_va, y_va, input_dim, hidden=100, sub=20, epochs=27, lr=1
         ep_start = time.time()
         idx = jax.random.permutation(jax.random.key(ep), len(X_tr))
         ep_loss = 0
-        
-        pct = (ep + 1) / epochs
-        bar_len = 20
-        filled = int(bar_len * pct)
-        bar = "█" * filled + "░" * (bar_len - filled)
-        print(f"\rEpoch {ep+1:2d}/{epochs} [{bar}] {pct*100:.1f}%", end="", flush=True)
         
         for i in range(0, len(X_tr), 128):
             b_idx = idx[i:i+128]
@@ -51,18 +45,17 @@ def train(X_tr, y_tr, X_va, y_va, input_dim, hidden=100, sub=20, epochs=27, lr=1
         
         train_losses.append(train_loss)
         val_losses.append(val_loss)
+        train_accs.append(train_acc)
+        val_accs.append(val_acc)
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             best_params = params
         
-        ep_elapsed = time.time() - ep_start
-        eta = ep_elapsed * (epochs - ep - 1)
-        pct = (ep + 1) * 100 // epochs
-        print(f"Epoch {ep+1}/{epochs} [{pct}%] | train: {train_loss:.4f} ({100*train_acc:.1f}%) | val: {val_loss:.4f} ({100*val_acc:.1f}%) | ETA: {eta:.0f}s")
+        print(f"Epoch {ep+1:2d}/{epochs} | val_loss: {val_loss:.4f} | val_acc: {100*val_acc:.2f}% | train_loss: {train_loss:.4f} | train_acc: {100*train_acc:.2f}%")
 
     elapsed = time.time() - start
     best_val_preds = tkan_apply(best_params, X_va)
     acc = jnp.mean((best_val_preds > 0.5) == y_va)
-    print(f"Time: {elapsed:.1f}s, Best Val Loss: {best_val_loss:.4f}, Best Val Accuracy: {acc:.4f}")
+    print(f"\nDone! Time: {elapsed:.1f}s | Best Val Loss: {best_val_loss:.4f} | Best Val Acc: {100*acc:.2f}%")
 
-    return best_params, train_losses, val_losses, acc, elapsed
+    return best_params, train_losses, val_losses, train_accs, val_accs, elapsed

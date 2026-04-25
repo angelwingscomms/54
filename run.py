@@ -130,22 +130,24 @@ def main():
     input_dim = X_tr.shape[-1]
 
     print("\n=== TKAN ===")
-    params, train_losses, val_losses, val_acc, elapsed = train(
+    params, train_losses, val_losses, train_accs, val_accs, elapsed = train(
         X_tr, y_tr, X_va, y_va, input_dim, hidden, sub, epochs=cfg['epochs'], lr=cfg['learning_rate']
     )
     test_loss = float(eval_loss(params, X_te, y_te))
     test_preds = tkan_apply(params, X_te)
     test_acc = float(jnp.mean((test_preds > 0.5) == y_te))
 
-    print("\n" + "="*48)
+    print("\n" + "="*60)
     print("SUMMARY")
-    print("="*48)
-    print(f"{'Epoch':>6} | {'Train':>8} | {'Val':>8}")
-    print("-"*48)
-    for i, (tl, vl) in enumerate(zip(train_losses, val_losses)):
-        print(f"{i+1:>6} | {tl:>8.4f} | {vl:>8.4f}")
-    print("="*48)
-    print(f"TKAN time: {elapsed:.1f}s  Final val_acc: {val_acc:.4f}  Test loss: {test_loss:.4f}  Test acc: {test_acc:.4f}")
+    print("="*60)
+    print(f"{'Epoch':>5} | {'val_loss':>8} | {'val_acc':>8} | {'train_loss':>10} | {'train_acc':>10}")
+    print("-"*60)
+    for i, (vl, va, tl, ta) in enumerate(zip(val_losses, val_accs, train_losses, train_accs)):
+        print(f"{i+1:>5} | {vl:>8.4f} | {va*100:>7.2f}% | {tl:>10.4f} | {ta*100:>9.2f}%")
+    print("="*60)
+    final_va = val_accs[-1]
+    print(f"Final val_acc: {100*final_va:.2f}% | Test loss: {test_loss:.4f} | Test acc: {100*test_acc:.2f}%")
+    print(f"Total time: {elapsed:.1f}s")
 
     cfg['input_dim'] = int(input_dim)
     save_norm_params(xmin, xmax)
