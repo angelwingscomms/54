@@ -57,8 +57,8 @@ void RunModel() {
 
    Print("prices: oldest=", price0, " latest=", price1, " norm_min=", NORM_MIN[0], " norm_max=", NORM_MAX[0]);
    vectorf y(1);
-   matrixf x3d(1, 45, 4);
-   x3d = x;
+   matrixf x3d = x;
+   x3d.Resize(1, 180);
    if(!OnnxRun(gOnnxHandle, 0, x3d, y)) { Print("ONNX run failed: ", GetLastError()); return; }
    Print("pred=", y[0]);
    Trade((double)y[0]);
