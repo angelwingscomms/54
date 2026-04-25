@@ -8,7 +8,7 @@ void OnStart() {
    Print("Fetching BTCUSD data...");
    
    string filename = "data.csv";
-   int fileHandle = FileOpen(filename, FILE_CSV|FILE_WRITE, ",");
+   int fileHandle = FileOpen(filename, FILE_CSV|FILE_WRITE|FILE_ANSI, ",");
    
    if(fileHandle == INVALID_HANDLE) {
       Print("Failed to open file: ", GetLastError());

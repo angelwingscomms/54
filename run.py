@@ -1,6 +1,7 @@
 import os
 os.environ['JAX_CPU_COLLECTIVE_IMPL_HEADER_ONLY'] = '1'
 
+import yaml
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -11,19 +12,38 @@ from jax2onnx import to_onnx
 
 jax.default_backend = 'cpu'
 
+DEFAULTS = {
+    'symbol': 'BTC',
+    'target_type': 'atr',
+    'atr_multiplier': 2.0,
+    'tp_multiplier': 2.0,
+    'atr_period': 9,
+    'threshold_pct': 1.0,
+    'stop_loss_pct': 0.5,
+    'n_ahead': 9,
+}
+
+def load_config():
+    with open('config.yaml') as f:
+        cfg = yaml.safe_load(f) or {}
+    for k, v in DEFAULTS.items():
+        if k not in cfg:
+            print(f'WARNING: {k} not specified, using default {v}')
+    return {**DEFAULTS, **cfg}
+
 
 def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
-               target_type='atr', atr_multiplier=2.0, tp_multiplier=2.0, atr_period=14):
-    df = pd.read_csv(path, index_col=0, parse_dates=True)
+               target_type='atr', atr_multiplier=2.0, tp_multiplier=2.0, atr_period=9):
+    df = pd.read_csv(path, index_col=0, parse_dates=True, encoding='utf-16')
     
     btc = df[['open', 'high', 'low', 'close']].copy()
     
-    prev_close = btc['BTC close'].shift(1)
+    prev_close = btc['close'].shift(1)
     tr = np.maximum(
-        btc['BTC high'] - btc['BTC low'],
+        btc['high'] - btc['low'],
         np.maximum(
-            np.abs(btc['BTC high'] - prev_close),
-            np.abs(btc['BTC low'] - prev_close)
+            np.abs(btc['high'] - prev_close),
+            np.abs(btc['low'] - prev_close)
         )
     )
     atr = tr.rolling(window=atr_period).mean()
@@ -34,7 +54,7 @@ def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
     for i in range(45, len(btc) - horizon):
         X.append(btc.iloc[i - 45:i].values)
         
-        close = btc.iloc[i]['BTC close']
+        close = btc.iloc[i]['close']
         
         if target_type == 'atr':
             atr_val = atr.iloc[i]
@@ -47,8 +67,8 @@ def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
         
         tp_idx = sl_idx = None
         for j in range(1, horizon + 1):
-            high = btc.iloc[i + j]['BTC high']
-            low = btc.iloc[i + j]['BTC low']
+            high = btc.iloc[i + j]['high']
+            low = btc.iloc[i + j]['low']
             if tp_idx is None and high >= tp_price:
                 tp_idx = j
             if sl_idx is None and low <= sl_price:
@@ -80,6 +100,32 @@ def save_norm_params(xmin, xmax):
     with open("norm_params.mqh", "w") as f:
         f.write(content)
     print(f"Saved norm_params.mqh ({n} features)")
+
+
+def save_config(cfg):
+    content = []
+    mappings = [
+        ('symbol', 'string', 'CFG_SYMBOL'),
+        ('target_type', 'string', 'CFG_TARGET_TYPE'),
+        ('atr_multiplier', 'double', 'CFG_ATR_MULTIPLIER'),
+        ('tp_multiplier', 'double', 'CFG_TP_MULTIPLIER'),
+        ('atr_period', 'int', 'CFG_ATR_PERIOD'),
+        ('threshold_pct', 'double', 'CFG_THRESHOLD_PCT'),
+        ('stop_loss_pct', 'double', 'CFG_TOLERANCE'),
+        ('sequence_length', 'int', 'CFG_SEQUENCE_LENGTH'),
+    ]
+    for key, mql_type, name in mappings:
+        v = cfg.get(key)
+        if v is None:
+            v = DEFAULTS.get(key)
+        if mql_type == 'string':
+            content.append(f'const string {name} = "{v}";')
+        else:
+            content.append(f'const {mql_type} {name} = {v};')
+    
+    with open('config.mqh', 'w') as f:
+        f.write('\n'.join(content))
+    print('Saved config.mqh')
 
 
 def init_tkan(input_dim, hidden, sub, key):
@@ -130,8 +176,20 @@ def tkan_apply(params, x, hidden=100):
     return jax.nn.sigmoid(jnp.dot(tkan_fwd(params, x, hidden), params['dense_w']) + params['dense_b'])
 
 def main():
-    print("Loading data...", flush=True)
-    X, y = load_data()
+    print('Loading config...', flush=True)
+    cfg = load_config()
+    
+    print('Loading data...', flush=True)
+    X, y = load_data(
+        path=cfg['data_path'],
+        tp_pct=cfg['threshold_pct'],
+        tolerance=cfg['stop_loss_pct'],
+        horizon=cfg['n_ahead'],
+        target_type=cfg['target_type'],
+        atr_multiplier=cfg['atr_multiplier'],
+        tp_multiplier=cfg['tp_multiplier'],
+        atr_period=cfg['atr_period']
+    )
     print(f"Loaded X: {X.shape}", flush=True)
     
     sep = int(len(X) * 0.8)
@@ -212,6 +270,7 @@ def main():
     print(f"TKAN time: {tkan_time:.1f}s  Final val_acc: {acc:.4f}")
 
     save_norm_params(xmin, xmax)
+    save_config(cfg)
 
     print("\nExporting model to ONNX...")
     def make_apply_fn(params):

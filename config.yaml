@@ -1,5 +1,14 @@
+# Symbol
+symbol: "BTC"
+
+# Symbol
+target_type: "atr"
+atr_multiplier: 2.0
+tp_multiplier: 2.0
+atr_period: 9
+
 # Data
-data_path: "examples/data.parquet"
+data_path: "data.csv"
 timeframe_minutes: 60
 sequence_length: 45
 n_ahead: 9
