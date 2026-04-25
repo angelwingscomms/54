@@ -104,16 +104,14 @@ for epoch in range(epochs):
         def loss_fn(params):
             predictions = tkan_apply(params, batch_X, use_sigmoid=True)
             return binary_crossentropy(predictions, batch_y)
-        
+
         loss, gradients = jax.value_and_grad(loss_fn)(params)
-        
+        epoch_loss += loss
+        epoch_accuracy += compute_accuracy(tkan_apply(params, batch_X, use_sigmoid=True), batch_y)
+
         # Update parameters using Adam optimizer
         updates, optimizer_state = optimizer.update(gradients, optimizer_state)
         params = optax.apply_updates(params, updates)
-        
-        # Accumulate metrics
-        epoch_loss += loss
-        epoch_accuracy += compute_accuracy(tkan_apply(params, batch_X, use_sigmoid=True), batch_y)
         num_batches += 1
     
     # Report epoch progress
