@@ -24,4 +24,4 @@ seed: 42
 
 # Output
 model_output: "model.onnx"
-norm_output: "norm_params.csv"
+norm_output: "norm_params.mqh"

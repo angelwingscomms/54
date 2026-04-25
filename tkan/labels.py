@@ -38,7 +38,8 @@ def normalize_features(X_train, X_test):
     return X_train, X_test, xmin, xmax
 
 
-def save_norm_params(xmin, xmax, path='norm_params.csv'):
+def save_norm_params(xmin, xmax, path='norm_params.mqh'):
+    n = len(xmin)
     with open(path, 'w') as f:
-        f.write(','.join(f'{v:.10f}' for v in xmin) + '\n')
-        f.write(','.join(f'{v:.10f}' for v in xmax) + '\n')
+        f.write(f'const double NORM_MIN[{n}] = {{{",".join(f"{v:.10f}" for v in xmin)}}};\n')
+        f.write(f'const double NORM_MAX[{n}] = {{{",".join(f"{v:.10f}" for v in xmax)}}};\n')

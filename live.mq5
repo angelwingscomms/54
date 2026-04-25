@@ -2,10 +2,12 @@
 #property version "1.00"
 #property strict
 
+#include "norm_params.mqh"
+
 input double LotSize = 0.01;
-input int    TimeframeMinutes = 60;
-input int    NumCandles = 45;
-input int    NumFeats = 40;
+input int TimeframeMinutes = 60;
+input int NumCandles = 45;
+input int NumFeats = 40;
 
 datetime lastBar = 0;
 long OnnxHandle = INVALID_HANDLE;
@@ -17,9 +19,6 @@ string Symbols[] = {
 };
 
 #resource "model.onnx" as uchar ExtModel[]
-
-double NormMin[];
-double NormMax[];
 
 int OnInit() {
    if(TimeframeMinutes < 1) { Print("TimeframeMinutes must be >= 1"); return INIT_FAILED; }
@@ -34,12 +33,9 @@ int OnInit() {
       default:  TF = PERIOD_CURRENT; break;
    }
 
-   OnnxHandle = OnnxCreateFromBuffer(ExtModel, ONNX_DEFAULT);
-   if(OnnxHandle == INVALID_HANDLE) { Print("ONNX create failed: ", GetLastError()); return INIT_FAILED; }
-
-   if(!LoadNormParams())
-      Print("WARNING: norm_params.csv not found");
-   return INIT_SUCCEEDED;
+OnnxHandle = OnnxCreateFromBuffer(ExtModel, ONNX_DEFAULT);
+if(OnnxHandle == INVALID_HANDLE) { Print("ONNX create failed: ", GetLastError()); return INIT_FAILED; }
+return INIT_SUCCEEDED;
 }
 
 void OnDeinit(const int reason) {
@@ -66,13 +62,11 @@ void RunModel() {
       }
    }
 
-   if(ArraySize(NormMin) == NumFeats) {
-      for(int f = 0; f < NumFeats; f++) {
-         double range = NormMax[f] - NormMin[f];
-         if(range < 1e-8) range = 1e-8;
-         for(int i = 0; i < NumCandles; i++)
-            x[i, f] = (float)((x[i, f] - NormMin[f]) / range);
-      }
+   for(int f = 0; f < NumFeats; f++) {
+      double range = NORM_MAX[f] - NORM_MIN[f];
+      if(range < 1e-8) range = 1e-8;
+      for(int i = 0; i < NumCandles; i++)
+         x[i, f] = (float)((x[i, f] - NORM_MIN[f]) / range);
    }
 
    matrixf x3d[1];
@@ -118,18 +112,4 @@ void CloseTrade() {
    if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE) Print("CLOSED");
 }
 
-bool LoadNormParams() {
-   int h = FileOpen("norm_params.csv", FILE_READ | FILE_CSV | FILE_ANSI, ',');
-   if(h == INVALID_HANDLE) return false;
-   string minLine = FileReadString(h);
-   string maxLine = FileReadString(h);
-   FileClose(h);
-   string mn[], mx[];
-   int nMin = StringSplit(minLine, ',', mn);
-   int nMax = StringSplit(maxLine, ',', mx);
-   if(nMin != NumFeats || nMax != NumFeats) { Print("norm_params feat count mismatch"); return false; }
-   ArrayResize(NormMin, NumFeats); ArrayResize(NormMax, NumFeats);
-   for(int i = 0; i < NumFeats; i++) { NormMin[i] = StringToDouble(mn[i]); NormMax[i] = StringToDouble(mx[i]); }
-   Print("norm_params OK");
-   return true;
-}
+
