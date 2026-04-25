@@ -3,8 +3,8 @@ symbol: "BTCUSD"
 
 # Symbol
 target_type: "atr"
-atr_multiplier: 2.0
-tp_multiplier: 2.0
+atr_multiplier: 1.08
+tp_multiplier: 1.8
 atr_period: 9
 
 # Data
