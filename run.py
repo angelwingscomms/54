@@ -21,23 +21,52 @@ DEFAULTS = {
     'threshold_pct': 1.0,
     'stop_loss_pct': 0.5,
     'n_ahead': 9,
+    'data_path': 'data.csv',
 }
 
 def load_config():
+    print("\n" + "="*50)
+    print("LOADING CONFIG")
+    print("="*50)
     with open('config.yaml') as f:
         cfg = yaml.safe_load(f) or {}
+    print(f"  config.yaml loaded successfully")
+    print(f"  Config keys found: {list(cfg.keys())}")
+    print("-"*50)
+    print("  Applied settings:")
     for k, v in DEFAULTS.items():
-        if k not in cfg:
-            print(f'WARNING: {k} not specified, using default {v}')
+        if k in cfg:
+            print(f"    [{k}] = {v} (from config)")
+        else:
+            print(f"    [{k}] = {v} (DEFAULT)")
+    print("="*50 + "\n")
     return {**DEFAULTS, **cfg}
 
 
-def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
+def load_data(path='data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
                target_type='atr', atr_multiplier=2.0, tp_multiplier=2.0, atr_period=9):
+    print("\n" + "="*50)
+    print("LOADING DATA")
+    print("="*50)
+    print(f"  Path: {path}")
+    print(f"  Parameters:")
+    print(f"    - tp_pct: {tp_pct}")
+    print(f"    - tolerance: {tolerance}")
+    print(f"    - horizon: {horizon}")
+    print(f"    - target_type: {target_type}")
+    print(f"    - atr_multiplier: {atr_multiplier}")
+    print(f"    - tp_multiplier: {tp_multiplier}")
+    print(f"    - atr_period: {atr_period}")
+    
+    print(f"\n  Loading CSV file...")
     df = pd.read_csv(path, index_col=0, parse_dates=True, encoding='utf-16', date_format='%Y-%m-%d %H-%M')
+    print(f"  CSV loaded: {len(df)} rows")
+    print(f"  Columns: {list(df.columns)}")
     
     btc = df[['open', 'high', 'low', 'close']].copy()
+    print(f"  Extracted OHLC data: {btc.shape}")
     
+    print(f"\n  Computing ATR (period={atr_period})...")
     prev_close = btc['close'].shift(1)
     tr = np.maximum(
         btc['high'] - btc['low'],
@@ -47,9 +76,12 @@ def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
         )
     )
     atr = tr.rolling(window=atr_period).mean()
+    print(f"  ATR computed, first valid ATR at index: {atr.first_valid_index()}")
     
     sl_pct = -tp_pct * tolerance
+    print(f"  Stop loss percentage: {sl_pct}%")
     
+    print(f"\n  Building training samples (sequence_length=45, horizon={horizon})...")
     X, y = [], []
     for i in range(45, len(btc) - horizon):
         X.append(btc.iloc[i - 45:i].values)
@@ -78,7 +110,19 @@ def load_data(path='examples/data.csv', tp_pct=3.0, tolerance=0.2, horizon=24,
         
         y.append(1.0 if tp_idx and (sl_idx is None or tp_idx < sl_idx) else 0.0)
     
-    return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32).reshape(-1, 1)
+    X_arr = np.array(X, dtype=np.float32)
+    y_arr = np.array(y, dtype=np.float32).reshape(-1, 1)
+    
+    pos_count = int(y_arr.sum())
+    neg_count = len(y_arr) - pos_count
+    print(f"\n  Done! Generated {len(X_arr)} samples")
+    print(f"    - X shape: {X_arr.shape}")
+    print(f"    - y shape: {y_arr.shape}")
+    print(f"    - Positive (TP hit): {pos_count} ({100*pos_count/len(y_arr):.1f}%)")
+    print(f"    - Negative (SL hit): {neg_count} ({100*neg_count/len(y_arr):.1f}%)")
+    print("="*50 + "\n")
+    
+    return X_arr, y_arr
 
 
 def normalize(xmin, xmax, X_tr, X_te, y_tr, y_te):
@@ -176,10 +220,12 @@ def tkan_apply(params, x, hidden=100):
     return jax.nn.sigmoid(jnp.dot(tkan_fwd(params, x, hidden), params['dense_w']) + params['dense_b'])
 
 def main():
-    print('Loading config...', flush=True)
+    print("\n" + "#"*60)
+    print("# TKAN TRAINING PIPELINE STARTING")
+    print("#"*60 + "\n")
+    
     cfg = load_config()
     
-    print('Loading data...', flush=True)
     X, y = load_data(
         path=cfg['data_path'],
         tp_pct=cfg['threshold_pct'],
@@ -190,24 +236,36 @@ def main():
         tp_multiplier=cfg['tp_multiplier'],
         atr_period=cfg['atr_period']
     )
-    print(f"Loaded X: {X.shape}", flush=True)
     
+    print("\n" + "-"*50)
+    print("SPLITTING DATA (80% train / 20% test)")
+    print("-"*50)
     sep = int(len(X) * 0.8)
     X_tr, X_te = X[:sep], X[sep:]
     y_tr, y_te = y[:sep], y[sep:]
+    print(f"  Training samples:   {len(X_tr)}")
+    print(f"  Test samples:      {len(X_te)}")
     
+    print("\n" + "-"*50)
+    print("NORMALIZING DATA")
+    print("-"*50)
     xmin, xmax = X_tr.min(axis=(0, 1), keepdims=True), X_tr.max(axis=(0, 1), keepdims=True)
+    print(f"  X_min range: [{xmin.min():.4f}, {xmin.max():.4f}]")
+    print(f"  X_max range: [{xmax.min():.4f}, {xmax.max():.4f}]")
     X_tr, X_te, y_tr, y_te = normalize(xmin, xmax, X_tr, X_te, y_tr, y_te)
+    print("  Normalization applied!")
     
     X_tr = jnp.array(X_tr)
     y_tr = jnp.array(y_tr)
     X_te = jnp.array(X_te)
     y_te = jnp.array(y_te)
     
-    # jax.config.update("jax_disable_jit", True)
-    
-    print(f"X_train: {X_tr.shape}, y_train: {y_tr.shape}")
-    print(f"X_test: {X_te.shape}, y_test: {y_te.shape}")
+    print(f"\n  Converted to JAX arrays:")
+    print(f"    X_train: {X_tr.shape}")
+    print(f"    y_train: {y_tr.shape}")
+    print(f"    X_test:  {X_te.shape}")
+    print(f"    y_test:  {y_te.shape}")
+    print("-"*50 + "\n")
     
     hidden, sub = 100, 20
     input_dim = X_tr.shape[-1]
