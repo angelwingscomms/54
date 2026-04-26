@@ -7,6 +7,6 @@ don't worry if push fails, it's the commit that's important
 
 after every edit turn do `git add .` and make a long commit exhaustively explain every change you made in a detailed easy to understand way. then push; now this push is important, make sure it works
 
-never add `.onnx` files to `.gitignore`.
+never add `.onnx` files to `.gitignore`
 
 be minimalist
