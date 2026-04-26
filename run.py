@@ -7,11 +7,10 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import pandas as pd
-import yaml
 from tkan import (
     load_config, load_csv, compute_atr, build_samples,
-    normalize, save_norm_params, save_config, to_onnx_model, train, eval_loss, tkan_apply,
-    build_feature_frame, select_symbol_ohlc,
+    normalize, train, build_feature_frame, select_symbol_ohlc,
+    save_model_outputs,
 )
 
 jax.default_backend = 'cpu'
@@ -157,70 +156,38 @@ def main():
     )
 
     cfg['input_dim'] = int(input_dim)
-    save_norm_params(xmin, xmax, output_dir=str(model_dir))
-    save_config(cfg, output_dir=str(model_dir))
 
-    with open(model_dir / 'config.yaml', 'w') as f:
-        yaml.dump(cfg, f, default_flow_style=False)
-    print(f"Saved config.yaml to {model_dir}")
+    print("\nSaving model outputs...")
+    save_model_outputs(
+        model_dir=model_dir,
+        cfg=cfg,
+        params=params,
+        xmin=xmin,
+        xmax=xmax,
+        seq_len=seq_len,
+        input_dim=input_dim,
+        hidden=hidden,
+        sub=sub,
+        train_losses=train_losses,
+        val_losses=val_losses,
+        train_accs=train_accs,
+        val_accs=val_accs,
+        best_epoch=best_epoch,
+        best_val_loss=best_val_loss,
+        best_val_acc=best_val_acc,
+        test_loss=test_loss,
+        test_acc=test_acc,
+        elapsed=elapsed,
+    )
 
-    notes = f"""# Model Training Notes
-
-## Best Epoch
-- **Epoch**: {best_epoch} (of {cfg['epochs']} total)
-
-## Training Metrics (at best epoch)
-- **Train Loss**: {train_losses[best_epoch-1]:.6f}
-- **Train Accuracy**: {train_accs[best_epoch-1]*100:.2f}%
-- **Val Loss**: {val_losses[best_epoch-1]:.6f}
-- **Val Accuracy**: {val_accs[best_epoch-1]*100:.2f}%
-
-## Final Metrics (after best epoch)
-- **Best Val Loss**: {best_val_loss:.6f}
-- **Best Val Accuracy**: {best_val_acc*100:.2f}%
-- **Test Loss**: {test_loss:.6f}
-- **Test Accuracy**: {test_acc*100:.2f}%
-
-## Training Time
-- **Total elapsed**: {elapsed:.1f} seconds
-
-## Configuration
-- **Sequence length**: {cfg['sequence_length']}
-- **Hidden size**: {cfg['hidden_size']}
-- **Sub dim**: {cfg['sub_dim']}
-- **Batch size**: {cfg['batch_size']}
-- **Learning rate**: {cfg['learning_rate']}
-- **Seed**: {cfg['seed']}
-- **Input dim**: {input_dim}
-
-## Epoch History
-"""
-    for ep in range(cfg['epochs']):
-        notes += f"- Epoch {ep+1}: train_loss={train_losses[ep]:.6f}, train_acc={train_accs[ep]*100:.2f}%, val_loss={val_losses[ep]:.6f}, val_acc={val_accs[ep]*100:.2f}%\n"
-
-    with open(model_dir / 'notes.md', 'w') as f:
-        f.write(notes)
-    print(f"Saved notes.md to {model_dir}")
-
-    print("\nExporting model to ONNX...")
-    to_onnx_model(params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub, output_dir=str(model_dir))
+    expert_path = Path('live.ex5')
     model_path = model_dir / 'model.onnx'
     config_path = model_dir / 'config.mqh'
     norm_path = model_dir / 'norm_params.mqh'
-    expert_path = Path('live.ex5')
-    latest_input = max(path.stat().st_mtime for path in (model_path, config_path, norm_path))
-    if not expert_path.exists() or expert_path.stat().st_mtime < latest_input:
-        print("live.ex5 is older than model.onnx/config.mqh/norm_params.mqh. Recompile live.mq5 in MetaEditor before running the tester.")
-
-    ts = model_dir.name
-    live_mq5 = Path('live.mq5')
-    if live_mq5.exists():
-        content = live_mq5.read_text()
-        content = content.replace('#include "config.mqh"', f'#include "models/{ts}/config.mqh"')
-        content = content.replace('#include "norm_params.mqh"', f'#include "models/{ts}/norm_params.mqh"')
-        content = content.replace('#resource "\\\\Experts\\\\TKAN\\\\model.onnx"', f'#resource "\\\\Experts\\\\54\\\\models\\\\{ts}\\\\model.onnx"')
-        live_mq5.write_text(content)
-        print(f"Updated live.mq5 to use model: {ts}")
+    if expert_path.exists():
+        latest_input = max(path.stat().st_mtime for path in (model_path, config_path, norm_path))
+        if expert_path.stat().st_mtime < latest_input:
+            print("live.ex5 is older than model. Recompile live.mq5 in MetaEditor before running the tester.")
 
 
 if __name__ == '__main__':

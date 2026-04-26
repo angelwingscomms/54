@@ -4,6 +4,7 @@ from .features import build_feature_frame
 from .preprocess import compute_atr, build_samples
 from .normalize import normalize
 from .export import save_norm_params, save_config, to_onnx_model
+from .save import save_model_outputs
 from .tkan_init import init_tkan
 from .tkan_cell import tkan_cell
 from .tkan_forward import tkan_fwd
@@ -24,6 +25,7 @@ __all__ = [
     'save_norm_params',
     'save_config',
     'to_onnx_model',
+    'save_model_outputs',
     'init_tkan',
     'tkan_cell',
     'tkan_fwd',
