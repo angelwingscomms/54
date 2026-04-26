@@ -6,7 +6,7 @@ target_type: "atr"
 atr_multiplier: 5.4
 tp_multiplier: 1.44
 atr_period: 9
-confidence_threshold: 0.45
+confidence_threshold: 0.27
 
 # Data
 data_path: "54"
@@ -36,33 +36,32 @@ feature_symbols:
 features:
   log_returns:
     enabled: true
-    periods: [1, 5, 15, 60]
+    periods: [1, 5]
   candle_ratios:
-    enabled: true
+    enabled: false
   garman_klass:
     enabled: true
-    windows: [5, 15, 60]
+    windows: [5]
   rolling_volatility:
     enabled: true
-    windows: [5, 15, 60]
+    windows: [5]
   bollinger:
     enabled: true
-    periods: [20]
+    periods: [9]
     std: 2.0
   price_to_sma:
     enabled: true
     periods: [15]
   price_to_ema:
     enabled: true
-    periods: [5, 15, 50]
+    periods: [5]
   ema_cross:
     enabled: true
     pairs:
       - [9, 18]
-      - [18, 54]
   rsi:
     enabled: true
-    periods: [7, 14]
+    periods: [3, 6, 9]
   adx:
     enabled: true
     periods: [9]
@@ -73,7 +72,7 @@ features:
     signal: 9
   higher_timeframes:
     enabled: false
-    timeframes: [15, 60]
+    timeframes: [9]
     log_return_periods: [1]
     rsi_periods: [14]
     macd:
@@ -97,7 +96,7 @@ sub_dim: 20
 # Training
 batch_size: 256
 learning_rate: 0.00001
-epochs: 108
+epochs: 9
 train_test_split: 0.8
 seed: 42
 
