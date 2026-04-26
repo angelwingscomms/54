@@ -50,7 +50,7 @@ features:
     periods: [9]
     std: 2.0
   price_to_sma:
-    enabled: true
+    enabled: false
     periods: [15]
   price_to_ema:
     enabled: true
@@ -74,7 +74,7 @@ features:
     enabled: false
     timeframes: [9]
     log_return_periods: [1]
-    rsi_periods: [14]
+    rsi_periods: [9]
     macd:
       fast: 12
       slow: 26
