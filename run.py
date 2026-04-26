@@ -1,6 +1,7 @@
 import os
 os.environ['JAX_CPU_COLLECTIVE_IMPL_HEADER_ONLY'] = '1'
 
+import argparse
 from datetime import datetime
 from pathlib import Path
 
@@ -17,13 +18,19 @@ jax.default_backend = 'cpu'
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-n', '--name', type=str, default='', help='Name prefix for model folder')
+    args = parser.parse_args()
+
+    cfg = load_config()
+    prefix = args.name + '-' if args.name else ''
+    model_dir = Path(f"/models/{prefix}{datetime.now().strftime('%d%m-%H%M%S')}")
+    model_dir.mkdir(parents=True, exist_ok=True)
+
     print("\n" + "#"*60)
     print("# TKAN TRAINING PIPELINE STARTING")
     print("#"*60 + "\n")
 
-    cfg = load_config()
-    model_dir = Path(f"/models/{datetime.now().strftime('%m%d-%H%M%S')}")
-    model_dir.mkdir(parents=True, exist_ok=True)
     print(f"  Model output directory: {model_dir}")
     seq_len = cfg['sequence_length']
 
