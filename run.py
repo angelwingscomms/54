@@ -140,6 +140,8 @@ def main():
         y_tr,
         X_va,
         y_va,
+        X_te,
+        y_te,
         input_dim,
         hidden,
         sub,
@@ -148,25 +150,6 @@ def main():
         batch_size=cfg['batch_size'],
         seed=cfg['seed'],
     )
-    test_loss = float(eval_loss(params, X_te, y_te))
-    test_preds = tkan_apply(params, X_te)
-    test_acc = float(jnp.mean((test_preds > 0.5) == y_te))
-
-    print("\n" + "="*60)
-    print("SUMMARY")
-    print("="*60)
-    print(f"{'Epoch':>5} | {'val_loss':>8} | {'val_acc':>8} | {'train_loss':>10} | {'train_acc':>10}")
-    print("-"*60)
-    for i, (vl, va, tl, ta) in enumerate(zip(val_losses, val_accs, train_losses, train_accs)):
-        print(f"{i+1:>5} | {vl:>8.4f} | {va*100:>7.2f}% | {tl:>10.4f} | {ta*100:>9.2f}%")
-    print("="*60)
-    best_epoch = val_losses.index(min(val_losses))
-    best_val_acc = val_accs[best_epoch]
-    best_train_loss = train_losses[best_epoch]
-    best_train_acc = train_accs[best_epoch]
-    print(f"Best epoch: {best_epoch+1}")
-    print(f"Best val_acc: {100*best_val_acc:.2f}% | Test loss: {test_loss:.4f} | Test acc: {100*test_acc:.2f}%")
-    print(f"Total time: {elapsed:.1f}s")
 
     cfg['input_dim'] = int(input_dim)
     save_norm_params(xmin, xmax)
