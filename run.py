@@ -1,6 +1,7 @@
 import os
 os.environ['JAX_CPU_COLLECTIVE_IMPL_HEADER_ONLY'] = '1'
 
+from datetime import datetime
 from pathlib import Path
 
 import jax
@@ -21,6 +22,9 @@ def main():
     print("#"*60 + "\n")
 
     cfg = load_config()
+    model_dir = Path(f"/models/{datetime.now().strftime('%m%d-%H%M%S')}")
+    model_dir.mkdir(parents=True, exist_ok=True)
+    print(f"  Model output directory: {model_dir}")
     seq_len = cfg['sequence_length']
 
     print("\n" + "="*50)
@@ -152,15 +156,14 @@ def main():
     )
 
     cfg['input_dim'] = int(input_dim)
-    save_norm_params(xmin, xmax)
-    save_config(cfg)
+    save_norm_params(xmin, xmax, output_dir=str(model_dir))
+    save_config(cfg, output_dir=str(model_dir))
 
     print("\nExporting model to ONNX...")
-    to_onnx_model(params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub)
-    print(f"Model saved to: model.onnx")
-    model_path = Path('model.onnx')
-    config_path = Path('config.mqh')
-    norm_path = Path('norm_params.mqh')
+    to_onnx_model(params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub, output_dir=str(model_dir))
+    model_path = model_dir / 'model.onnx'
+    config_path = model_dir / 'config.mqh'
+    norm_path = model_dir / 'norm_params.mqh'
     expert_path = Path('live.ex5')
     latest_input = max(path.stat().st_mtime for path in (model_path, config_path, norm_path))
     if not expert_path.exists() or expert_path.stat().st_mtime < latest_input:

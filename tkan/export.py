@@ -3,9 +3,10 @@ from jax2onnx import to_onnx
 import jax.numpy as jnp
 import onnx
 from onnx import TensorProto, helper
+from pathlib import Path
 
 
-def save_norm_params(xmin, xmax):
+def save_norm_params(xmin, xmax, output_dir='.'):
     xmin = xmin.squeeze()
     xmax = xmax.squeeze()
     n = len(xmin)
@@ -15,12 +16,13 @@ def save_norm_params(xmin, xmax):
         f"const double NORM_MIN[{n}] = {{{min_str}}};\n"
         f"const double NORM_MAX[{n}] = {{{max_str}}};\n"
     )
-    with open("norm_params.mqh", "w") as f:
+    path = Path(output_dir) / "norm_params.mqh"
+    with open(path, "w") as f:
         f.write(content)
-    print(f"Saved norm_params.mqh ({n} features)")
+    print(f"Saved norm_params.mqh ({n} features) to {path.parent}")
 
 
-def save_config(cfg):
+def save_config(cfg, output_dir='.'):
     def fmt(value):
         if isinstance(value, bool):
             return 'true' if value else 'false'
@@ -101,9 +103,10 @@ def save_config(cfg):
     add_scalar('CFG_TIME_MINUTE_ENABLED', 'bool', features['time']['minute'])
     add_scalar('CFG_TIME_DAY_OF_WEEK_ENABLED', 'bool', features['time']['day_of_week'])
 
-    with open('config.mqh', 'w') as f:
+    path = Path(output_dir) / 'config.mqh'
+    with open(path, 'w') as f:
         f.write('\n'.join(content))
-    print('Saved config.mqh')
+    print(f'Saved config.mqh to {path.parent}')
 
 
 def _get_shape(value_info):
@@ -206,7 +209,7 @@ def make_mql5_compatible(path='model.onnx'):
     return path
 
 
-def to_onnx_model(params, sequence_length=45, input_dim=4, hidden=100, sub=20):
+def to_onnx_model(params, sequence_length=45, input_dim=4, hidden=100, sub=20, output_dir='.'):
     from .tkan_forward import tkan_fwd
 
     def make_apply_fn(params_inner):
@@ -214,12 +217,14 @@ def to_onnx_model(params, sequence_length=45, input_dim=4, hidden=100, sub=20):
             return jax.nn.sigmoid(jnp.dot(tkan_fwd(params_inner, x, hidden), params_inner['dense_w']) + params_inner['dense_b'])
         return apply_fn
 
+    output_path = str(Path(output_dir) / 'model.onnx')
     result = to_onnx(
         make_apply_fn(params),
         inputs=[jax.ShapeDtypeStruct((1, sequence_length, input_dim), jnp.float32)],
         model_name='TKAN',
         return_mode='file',
-        output_path='model.onnx'
+        output_path=output_path
     )
-    make_mql5_compatible('model.onnx')
+    make_mql5_compatible(output_path)
+    print(f'Model saved to: {output_path}')
     return result
