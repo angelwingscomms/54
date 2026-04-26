@@ -6,7 +6,7 @@ target_type: "atr"
 atr_multiplier: 5.4
 tp_multiplier: 1.44
 atr_period: 9
-confidence_threshold: 0.81
+confidence_threshold: 0.45
 
 # Data
 data_path: "1m"
@@ -58,8 +58,8 @@ features:
   ema_cross:
     enabled: true
     pairs:
-      - [5, 15]
-      - [15, 50]
+      - [9, 18]
+      - [18, 54]
   rsi:
     enabled: true
     periods: [7, 14]
