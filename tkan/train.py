@@ -67,4 +67,4 @@ def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epo
     final_train_preds = tkan_apply(best_params, X_tr)
     final_train_acc = float(jnp.mean((final_train_preds > 0.5) == y_tr))
 
-    return best_params, train_losses, val_losses, train_accs, val_accs, elapsed, best_epoch, best_val_loss, best_val_acc, test_loss, test_acc, final_train_loss, final_train_acc
+    return best_params, train_losses, val_losses, train_accs, val_accs, elapsed, best_epoch, best_val_loss, best_val_acc, test_loss, test_acc, final_train_loss, final_train_acc, test_preds

@@ -22,6 +22,8 @@ def save_model_outputs(
     test_loss,
     test_acc,
     elapsed,
+    test_preds=None,
+    y_test=None,
     update_live_mq5=True,
 ):
     from .export import save_norm_params, save_config, to_onnx_model
@@ -70,6 +72,42 @@ def save_model_outputs(
     with open(model_dir / 'notes.md', 'w') as f:
         f.write(notes)
     print(f"Saved notes.md to {model_dir}")
+
+    if test_preds is not None and y_test is not None:
+        import jax.numpy as jnp
+        y_true = (jnp.array(y_test) > 0.5).astype(int).flatten()
+        y_pred = (jnp.array(test_preds) > 0.5).astype(int).flatten()
+        tp = jnp.sum((y_true == 1) & (y_pred == 1))
+        tn = jnp.sum((y_true == 0) & (y_pred == 0))
+        fp = jnp.sum((y_true == 0) & (y_pred == 1))
+        fn = jnp.sum((y_true == 1) & (y_pred == 0))
+        
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+        
+        cm_md = f"""# Confusion Matrix
+
+## Matrix
+|                | Predicted Sell | Predicted Buy |
+|----------------|----------------|---------------|
+| **Actual Sell** | {int(tn)} | {int(fp)} |
+| **Actual Buy**  | {int(fn)} | {int(tp)} |
+
+## Metrics
+- **True Positives (Buy→Buy)**: {int(tp)}
+- **True Negatives (Sell→Sell)**: {int(tn)}
+- **False Positives (Sell→Buy)**: {int(fp)}
+- **False Negatives (Buy→Sell)**: {int(fn)}
+
+- **Precision**: {precision:.4f}
+- **Recall**: {recall:.4f}
+- **F1 Score**: {f1:.4f}
+- **Accuracy**: {test_acc:.4f}
+"""
+        with open(model_dir / 'confusion_matrix.md', 'w') as f:
+            f.write(cm_md)
+        print(f"Saved confusion_matrix.md to {model_dir}")
 
     print("\nExporting model to ONNX...")
     to_onnx_model(params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub, output_dir=str(model_dir))

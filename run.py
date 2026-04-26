@@ -139,7 +139,7 @@ def main():
     input_dim = X_tr.shape[-1]
 
     print("\n=== TKAN ===")
-    params, train_losses, val_losses, train_accs, val_accs, elapsed, best_epoch, best_val_loss, best_val_acc, test_loss, test_acc, final_train_loss, final_train_acc = train(
+    params, train_losses, val_losses, train_accs, val_accs, elapsed, best_epoch, best_val_loss, best_val_acc, test_loss, test_acc, final_train_loss, final_train_acc, test_preds = train(
         X_tr,
         y_tr,
         X_va,
@@ -178,6 +178,8 @@ def main():
         test_loss=test_loss,
         test_acc=test_acc,
         elapsed=elapsed,
+        test_preds=test_preds,
+        y_test=y_te,
     )
 
     expert_path = Path('live.ex5')
