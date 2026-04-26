@@ -2,6 +2,7 @@ import os
 os.environ['JAX_CPU_COLLECTIVE_IMPL_HEADER_ONLY'] = '1'
 
 import argparse
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -197,6 +198,12 @@ def main():
         latest_input = max(path.stat().st_mtime for path in (model_path, config_path, norm_path))
         if expert_path.stat().st_mtime < latest_input:
             print("live.ex5 is older than model. Recompile live.mq5 in MetaEditor before running the tester.")
+
+    print("\nCommitting model to git...")
+    subprocess.run(['git', 'add', '.'], check=True)
+    subprocess.run(['git', 'commit', '-m', f'new model {model_dir.name}'], check=True)
+    subprocess.run(['git', 'push'], check=True)
+    print("Model committed and pushed.")
 
 
 if __name__ == '__main__':
