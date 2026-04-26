@@ -1,20 +1,6 @@
-be minimalist
-
-always do things in the simplest, most minimal way possible
-always write the simplest, most minimal code possible
-always use the simplest most minimal approach
-
-always explain stuff to me like i know nothing about neural networks or math
-but like you really have to get me to understand it technically
-so like teaching me stuff from scratch
-in a concise way
-
 always activate the virtual environment in ./env before trying to run any python, never create a new virtualenv
 
-always speak in an extremely concise manner to the user and always explain stuff to the user like i'm 9 years old
-code like an expert deep learning engineer with decades of experience and an uncompromisable standard of extreme perfection
-
-before every code change turn, run this:
+before every code change, run this:
 `git add .; git commit -m"before AI agent {short_update_name} update. agent: {your name}"; git push`
 let short update name not be longer than 3 words
 don't worry if push fails, it's the commit that's important
