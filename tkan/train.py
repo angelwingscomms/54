@@ -51,7 +51,7 @@ def train(X_tr, y_tr, X_va, y_va, input_dim, hidden=100, sub=20, epochs=27, lr=1
             best_val_loss = val_loss
             best_params = params
         
-        print(f"Epoch {ep+1:2d}/{epochs} | val_loss: {val_loss:.4f} | val_acc: {100*val_acc:.2f}% | train_loss: {train_loss:.4f} | train_acc: {100*train_acc:.2f}%")
+        
 
     elapsed = time.time() - start
     best_val_preds = tkan_apply(best_params, X_va)
