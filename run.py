@@ -53,7 +53,6 @@ def main():
     print(f"\n  Loading CSV file...")
     df = load_csv(f'./data/{cfg["data_path"]}')
     print(f"  CSV loaded: {len(df)} rows")
-    print(f"  Columns: {list(df.columns)}")
 
     features = build_feature_frame(df, cfg)
     target = select_symbol_ohlc(df, cfg['symbol'])

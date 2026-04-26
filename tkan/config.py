@@ -124,7 +124,7 @@ def resolve_feature_symbols(cfg):
 
 
 def load_config():
-    print("\n" + "="*50)
+    print("="*50)
     print("LOADING CONFIG")
     print("="*50)
     with open('config.yaml') as f:
@@ -137,15 +137,20 @@ def load_config():
     cfg['features'] = normalize_feature_config(raw_cfg.get('features'))
     cfg = resolve_feature_symbols(cfg)
     print(f"  config.yaml loaded successfully")
-    print(f"  Config keys found: {list(raw_cfg.keys())}")
     print("-"*50)
-    print("  Applied settings:")
-    for k, v in DEFAULTS.items():
-        if k in raw_cfg:
-            print(f"    [{k}] = {cfg[k]} (from config)")
-        else:
-            print(f"    [{k}] = {v} (DEFAULT)")
-    print(f"    [enabled_symbols] = {cfg['enabled_symbols']}")
-    print(f"    [enabled_feature_groups] = {[name for name, section in cfg['features'].items() if section.get('enabled')]}")
+    print("feature_symbols:")
+    for symbol, enabled in cfg['feature_symbols'].items():
+        print(f"  {symbol}: {enabled}")
+    print("features:")
+    for group, section in cfg['features'].items():
+        print(f"  {group}:")
+        for k, v in section.items():
+            print(f"    {k}: {v}")
+    print("enabled_symbols:")
+    for symbol in cfg['enabled_symbols']:
+        print(f"  - {symbol}")
+    print("enabled_feature_groups:")
+    for name in [n for n, s in cfg['features'].items() if s.get('enabled')]:
+        print(f"  - {name}")
     print("="*50 + "\n")
     return cfg

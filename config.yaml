@@ -65,7 +65,7 @@ features:
     periods: [7, 14]
   adx:
     enabled: true
-    periods: [14]
+    periods: [9]
   macd:
     enabled: true
     fast: 3
