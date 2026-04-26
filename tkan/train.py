@@ -63,4 +63,8 @@ def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epo
     test_acc = float(jnp.mean((test_preds > 0.5) == y_te))
     print(f"epoch {best_epoch} | val_loss {best_val_loss:.4f} | val_acc {100*best_val_acc:.2f}% | test_loss {test_loss:.4f} | test_acc {100*test_acc:.2f}% | time {elapsed:.1f}s")
 
-    return best_params, train_losses, val_losses, train_accs, val_accs, elapsed
+    final_train_loss = float(bce_loss(best_params, X_tr, y_tr) / len(X_tr) * batch_size)
+    final_train_preds = tkan_apply(best_params, X_tr)
+    final_train_acc = float(jnp.mean((final_train_preds > 0.5) == y_tr))
+
+    return best_params, train_losses, val_losses, train_accs, val_accs, elapsed, best_epoch, best_val_loss, best_val_acc, test_loss, test_acc, final_train_loss, final_train_acc
