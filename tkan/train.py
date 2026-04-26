@@ -60,6 +60,7 @@ def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epo
             val_losses.append(val_loss)
             train_accs.append(train_acc)
             val_accs.append(val_acc)
+            print(f"epoch {ep+1} | valloss {val_loss:.4f} | valacc {val_acc:.4f} | trainloss {train_loss:.4f} | trainacc {train_acc:.4f}")
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_params = params
