@@ -9,7 +9,7 @@ def main():
     parser.add_argument('new_prefix', help='New prefix for the model folder')
     args = parser.parse_args()
 
-    models_dir = Path('/models')
+    models_dir = Path('models')
     old_name = args.full_old_name
     new_prefix = args.new_prefix
 

@@ -25,7 +25,7 @@ def main():
 
     cfg = load_config()
     prefix = args.name + '-' if args.name else ''
-    model_dir = Path(f"/models/{prefix}{datetime.now().strftime('%d%m-%H%M%S')}")
+    model_dir = Path(f"models/{prefix}{datetime.now().strftime('%d%m-%H%M%S')}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
     print("\n" + "#"*60)
