@@ -174,6 +174,16 @@ def main():
     if not expert_path.exists() or expert_path.stat().st_mtime < latest_input:
         print("live.ex5 is older than model.onnx/config.mqh/norm_params.mqh. Recompile live.mq5 in MetaEditor before running the tester.")
 
+    ts = model_dir.name
+    live_mq5 = Path('live.mq5')
+    if live_mq5.exists():
+        content = live_mq5.read_text()
+        content = content.replace('#include "config.mqh"', f'#include "models/{ts}/config.mqh"')
+        content = content.replace('#include "norm_params.mqh"', f'#include "models/{ts}/norm_params.mqh"')
+        content = content.replace('#resource "\\\\Experts\\\\TKAN\\\\model.onnx"', f'#resource "\\\\Experts\\\\54\\\\models\\\\{ts}\\\\model.onnx"')
+        live_mq5.write_text(content)
+        print(f"Updated live.mq5 to use model: {ts}")
+
 
 if __name__ == '__main__':
     main()
