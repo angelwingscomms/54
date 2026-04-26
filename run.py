@@ -160,8 +160,12 @@ def main():
     for i, (vl, va, tl, ta) in enumerate(zip(val_losses, val_accs, train_losses, train_accs)):
         print(f"{i+1:>5} | {vl:>8.4f} | {va*100:>7.2f}% | {tl:>10.4f} | {ta*100:>9.2f}%")
     print("="*60)
-    final_va = val_accs[-1]
-    print(f"Final val_acc: {100*final_va:.2f}% | Test loss: {test_loss:.4f} | Test acc: {100*test_acc:.2f}%")
+    best_epoch = val_losses.index(min(val_losses))
+    best_val_acc = val_accs[best_epoch]
+    best_train_loss = train_losses[best_epoch]
+    best_train_acc = train_accs[best_epoch]
+    print(f"Best epoch: {best_epoch+1}")
+    print(f"Best val_acc: {100*best_val_acc:.2f}% | Test loss: {test_loss:.4f} | Test acc: {100*test_acc:.2f}%")
     print(f"Total time: {elapsed:.1f}s")
 
     cfg['input_dim'] = int(input_dim)
