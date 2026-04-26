@@ -1,12 +1,12 @@
 const string CFG_SYMBOL = "BTCUSD";
 const string CFG_TARGET_TYPE = "atr";
-const double CFG_ATR_MULTIPLIER = 6.3;
-const double CFG_TP_MULTIPLIER = 1.5;
+const double CFG_ATR_MULTIPLIER = 4.5;
+const double CFG_TP_MULTIPLIER = 1.44;
 const int CFG_ATR_PERIOD = 9;
 const double CFG_THRESHOLD_PCT = 1;
 const double CFG_TOLERANCE = 0.5;
-const int CFG_SEQUENCE_LENGTH = 45;
-const double CFG_CONFIDENCE_THRESHOLD = 0.6;
+const int CFG_SEQUENCE_LENGTH = 144;
+const double CFG_CONFIDENCE_THRESHOLD = 0.81;
 const string CFG_FEATURE_SYMBOLS = "BTCUSD";
 const int CFG_INPUT_DIM = 35;
 const bool CFG_LOG_RETURNS_ENABLED = true;
