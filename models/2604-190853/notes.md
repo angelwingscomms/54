@@ -1,0 +1,138 @@
+# Model Training Notes
+
+## Best Epoch
+- **Epoch**: 1 (of 108 total)
+
+## Training Metrics (at best epoch)
+- **Train Loss**: 0.895663
+- **Train Accuracy**: 40.88%
+- **Val Loss**: 0.415493
+- **Val Accuracy**: 76.19%
+
+## Final Metrics (after best epoch)
+- **Best Val Loss**: 0.415493
+- **Best Val Accuracy**: 76.19%
+- **Test Loss**: 1.025472
+- **Test Accuracy**: 41.86%
+
+## Training Time
+- **Total elapsed**: 150.0 seconds
+
+## Configuration
+- **Sequence length**: 270
+- **Hidden size**: 100
+- **Sub dim**: 20
+- **Batch size**: 256
+- **Learning rate**: 1e-05
+- **Seed**: 42
+- **Input dim**: 53
+
+## Epoch History
+- Epoch 1: train_loss=0.895663, train_acc=40.88%, val_loss=0.415493, val_acc=76.19%
+- Epoch 2: train_loss=0.876085, train_acc=42.06%, val_loss=0.417715, val_acc=76.19%
+- Epoch 3: train_loss=0.868261, train_acc=43.53%, val_loss=0.420158, val_acc=76.19%
+- Epoch 4: train_loss=0.871089, train_acc=44.41%, val_loss=0.422469, val_acc=76.19%
+- Epoch 5: train_loss=0.855413, train_acc=44.12%, val_loss=0.425014, val_acc=76.19%
+- Epoch 6: train_loss=0.862199, train_acc=43.24%, val_loss=0.427637, val_acc=76.19%
+- Epoch 7: train_loss=0.847576, train_acc=44.12%, val_loss=0.429638, val_acc=76.19%
+- Epoch 8: train_loss=0.836507, train_acc=45.29%, val_loss=0.431477, val_acc=76.19%
+- Epoch 9: train_loss=0.833337, train_acc=44.71%, val_loss=0.433194, val_acc=76.19%
+- Epoch 10: train_loss=0.856460, train_acc=44.41%, val_loss=0.434595, val_acc=76.19%
+- Epoch 11: train_loss=0.834104, train_acc=45.00%, val_loss=0.435783, val_acc=76.19%
+- Epoch 12: train_loss=0.836267, train_acc=44.41%, val_loss=0.436634, val_acc=76.19%
+- Epoch 13: train_loss=0.835987, train_acc=44.12%, val_loss=0.437723, val_acc=76.19%
+- Epoch 14: train_loss=0.832600, train_acc=44.12%, val_loss=0.438987, val_acc=76.19%
+- Epoch 15: train_loss=0.866200, train_acc=44.12%, val_loss=0.440208, val_acc=76.19%
+- Epoch 16: train_loss=0.839192, train_acc=44.12%, val_loss=0.441181, val_acc=76.19%
+- Epoch 17: train_loss=0.843338, train_acc=44.12%, val_loss=0.441922, val_acc=76.19%
+- Epoch 18: train_loss=0.837038, train_acc=44.12%, val_loss=0.442510, val_acc=76.19%
+- Epoch 19: train_loss=0.819143, train_acc=44.12%, val_loss=0.443014, val_acc=76.19%
+- Epoch 20: train_loss=0.833374, train_acc=44.12%, val_loss=0.443475, val_acc=76.19%
+- Epoch 21: train_loss=0.832486, train_acc=44.12%, val_loss=0.443906, val_acc=76.19%
+- Epoch 22: train_loss=0.833649, train_acc=44.12%, val_loss=0.444345, val_acc=76.19%
+- Epoch 23: train_loss=0.842391, train_acc=44.12%, val_loss=0.444638, val_acc=76.19%
+- Epoch 24: train_loss=0.829926, train_acc=44.12%, val_loss=0.445033, val_acc=76.19%
+- Epoch 25: train_loss=0.818957, train_acc=44.12%, val_loss=0.445378, val_acc=76.19%
+- Epoch 26: train_loss=0.836947, train_acc=44.12%, val_loss=0.445718, val_acc=76.19%
+- Epoch 27: train_loss=0.850222, train_acc=44.12%, val_loss=0.446075, val_acc=76.19%
+- Epoch 28: train_loss=0.808162, train_acc=44.12%, val_loss=0.446426, val_acc=76.19%
+- Epoch 29: train_loss=0.829895, train_acc=44.12%, val_loss=0.446763, val_acc=76.19%
+- Epoch 30: train_loss=0.827309, train_acc=44.12%, val_loss=0.447093, val_acc=76.19%
+- Epoch 31: train_loss=0.852268, train_acc=44.12%, val_loss=0.447422, val_acc=76.19%
+- Epoch 32: train_loss=0.824003, train_acc=44.12%, val_loss=0.447755, val_acc=76.19%
+- Epoch 33: train_loss=0.863157, train_acc=44.12%, val_loss=0.448091, val_acc=76.19%
+- Epoch 34: train_loss=0.859084, train_acc=44.12%, val_loss=0.448428, val_acc=76.19%
+- Epoch 35: train_loss=0.850778, train_acc=44.12%, val_loss=0.448766, val_acc=76.19%
+- Epoch 36: train_loss=0.829973, train_acc=44.12%, val_loss=0.449111, val_acc=76.19%
+- Epoch 37: train_loss=0.844599, train_acc=44.12%, val_loss=0.449467, val_acc=76.19%
+- Epoch 38: train_loss=0.863107, train_acc=44.12%, val_loss=0.449825, val_acc=76.19%
+- Epoch 39: train_loss=0.838472, train_acc=44.41%, val_loss=0.450178, val_acc=76.19%
+- Epoch 40: train_loss=0.859649, train_acc=44.41%, val_loss=0.450506, val_acc=76.19%
+- Epoch 41: train_loss=0.827457, train_acc=44.41%, val_loss=0.450835, val_acc=76.19%
+- Epoch 42: train_loss=0.858694, train_acc=44.41%, val_loss=0.451206, val_acc=76.19%
+- Epoch 43: train_loss=0.807330, train_acc=44.41%, val_loss=0.451675, val_acc=76.19%
+- Epoch 44: train_loss=0.812316, train_acc=44.71%, val_loss=0.451961, val_acc=76.19%
+- Epoch 45: train_loss=0.811454, train_acc=44.71%, val_loss=0.452302, val_acc=76.19%
+- Epoch 46: train_loss=0.846053, train_acc=44.71%, val_loss=0.452650, val_acc=76.19%
+- Epoch 47: train_loss=0.825804, train_acc=44.71%, val_loss=0.453001, val_acc=76.19%
+- Epoch 48: train_loss=0.838831, train_acc=44.71%, val_loss=0.453346, val_acc=76.19%
+- Epoch 49: train_loss=0.815725, train_acc=44.71%, val_loss=0.453699, val_acc=76.19%
+- Epoch 50: train_loss=0.846941, train_acc=44.71%, val_loss=0.454059, val_acc=76.19%
+- Epoch 51: train_loss=0.799535, train_acc=44.71%, val_loss=0.454419, val_acc=76.19%
+- Epoch 52: train_loss=0.807933, train_acc=44.71%, val_loss=0.454772, val_acc=76.19%
+- Epoch 53: train_loss=0.835589, train_acc=44.71%, val_loss=0.455119, val_acc=76.19%
+- Epoch 54: train_loss=0.830109, train_acc=44.71%, val_loss=0.455469, val_acc=76.19%
+- Epoch 55: train_loss=0.829677, train_acc=44.71%, val_loss=0.455827, val_acc=76.19%
+- Epoch 56: train_loss=0.813902, train_acc=44.71%, val_loss=0.456195, val_acc=76.19%
+- Epoch 57: train_loss=0.835763, train_acc=44.71%, val_loss=0.456565, val_acc=76.19%
+- Epoch 58: train_loss=0.835710, train_acc=45.00%, val_loss=0.456938, val_acc=76.19%
+- Epoch 59: train_loss=0.838947, train_acc=45.00%, val_loss=0.457313, val_acc=76.19%
+- Epoch 60: train_loss=0.807607, train_acc=45.00%, val_loss=0.457693, val_acc=76.19%
+- Epoch 61: train_loss=0.822357, train_acc=45.00%, val_loss=0.458072, val_acc=76.19%
+- Epoch 62: train_loss=0.829161, train_acc=45.00%, val_loss=0.458447, val_acc=76.19%
+- Epoch 63: train_loss=0.843086, train_acc=45.00%, val_loss=0.458822, val_acc=76.19%
+- Epoch 64: train_loss=0.809964, train_acc=45.00%, val_loss=0.459199, val_acc=76.19%
+- Epoch 65: train_loss=0.814669, train_acc=45.00%, val_loss=0.459566, val_acc=76.19%
+- Epoch 66: train_loss=0.819617, train_acc=45.29%, val_loss=0.459930, val_acc=76.19%
+- Epoch 67: train_loss=0.835995, train_acc=45.29%, val_loss=0.460297, val_acc=76.19%
+- Epoch 68: train_loss=0.837957, train_acc=45.29%, val_loss=0.460664, val_acc=76.19%
+- Epoch 69: train_loss=0.823698, train_acc=45.29%, val_loss=0.461028, val_acc=76.19%
+- Epoch 70: train_loss=0.859140, train_acc=45.29%, val_loss=0.461387, val_acc=76.19%
+- Epoch 71: train_loss=0.782882, train_acc=45.29%, val_loss=0.461745, val_acc=76.19%
+- Epoch 72: train_loss=0.793317, train_acc=45.29%, val_loss=0.462095, val_acc=76.19%
+- Epoch 73: train_loss=0.809900, train_acc=45.29%, val_loss=0.462435, val_acc=76.19%
+- Epoch 74: train_loss=0.803636, train_acc=45.29%, val_loss=0.462767, val_acc=76.19%
+- Epoch 75: train_loss=0.835806, train_acc=45.29%, val_loss=0.463095, val_acc=76.19%
+- Epoch 76: train_loss=0.796214, train_acc=45.29%, val_loss=0.463416, val_acc=76.19%
+- Epoch 77: train_loss=0.814114, train_acc=45.29%, val_loss=0.463725, val_acc=76.19%
+- Epoch 78: train_loss=0.810383, train_acc=45.29%, val_loss=0.464027, val_acc=76.19%
+- Epoch 79: train_loss=0.785071, train_acc=45.29%, val_loss=0.464319, val_acc=76.19%
+- Epoch 80: train_loss=0.805999, train_acc=45.59%, val_loss=0.464607, val_acc=76.19%
+- Epoch 81: train_loss=0.832850, train_acc=45.59%, val_loss=0.464900, val_acc=76.19%
+- Epoch 82: train_loss=0.801854, train_acc=45.59%, val_loss=0.465209, val_acc=76.19%
+- Epoch 83: train_loss=0.799140, train_acc=45.59%, val_loss=0.465516, val_acc=76.19%
+- Epoch 84: train_loss=0.807401, train_acc=45.59%, val_loss=0.465818, val_acc=76.19%
+- Epoch 85: train_loss=0.801222, train_acc=45.88%, val_loss=0.466112, val_acc=76.19%
+- Epoch 86: train_loss=0.821249, train_acc=45.88%, val_loss=0.466395, val_acc=76.19%
+- Epoch 87: train_loss=0.788311, train_acc=45.88%, val_loss=0.466671, val_acc=76.19%
+- Epoch 88: train_loss=0.835800, train_acc=46.18%, val_loss=0.466944, val_acc=76.19%
+- Epoch 89: train_loss=0.795100, train_acc=46.18%, val_loss=0.467221, val_acc=76.19%
+- Epoch 90: train_loss=0.816196, train_acc=46.18%, val_loss=0.467499, val_acc=76.19%
+- Epoch 91: train_loss=0.828085, train_acc=46.18%, val_loss=0.467779, val_acc=76.19%
+- Epoch 92: train_loss=0.820307, train_acc=46.18%, val_loss=0.468063, val_acc=76.19%
+- Epoch 93: train_loss=0.796903, train_acc=46.18%, val_loss=0.468353, val_acc=76.19%
+- Epoch 94: train_loss=0.814978, train_acc=46.18%, val_loss=0.468649, val_acc=76.19%
+- Epoch 95: train_loss=0.815019, train_acc=46.18%, val_loss=0.468954, val_acc=76.19%
+- Epoch 96: train_loss=0.802812, train_acc=46.18%, val_loss=0.469266, val_acc=76.19%
+- Epoch 97: train_loss=0.837970, train_acc=46.76%, val_loss=0.469585, val_acc=76.19%
+- Epoch 98: train_loss=0.818106, train_acc=46.76%, val_loss=0.469913, val_acc=76.19%
+- Epoch 99: train_loss=0.818329, train_acc=46.76%, val_loss=0.470252, val_acc=76.19%
+- Epoch 100: train_loss=0.825018, train_acc=46.76%, val_loss=0.470596, val_acc=76.19%
+- Epoch 101: train_loss=0.812107, train_acc=47.06%, val_loss=0.470944, val_acc=76.19%
+- Epoch 102: train_loss=0.793632, train_acc=47.35%, val_loss=0.471296, val_acc=76.19%
+- Epoch 103: train_loss=0.829267, train_acc=47.35%, val_loss=0.471658, val_acc=76.19%
+- Epoch 104: train_loss=0.801755, train_acc=47.35%, val_loss=0.472031, val_acc=76.19%
+- Epoch 105: train_loss=0.823232, train_acc=47.35%, val_loss=0.472403, val_acc=76.19%
+- Epoch 106: train_loss=0.820238, train_acc=47.35%, val_loss=0.472779, val_acc=76.19%
+- Epoch 107: train_loss=0.809958, train_acc=47.35%, val_loss=0.473155, val_acc=76.19%
+- Epoch 108: train_loss=0.807060, train_acc=47.35%, val_loss=0.473534, val_acc=76.19%

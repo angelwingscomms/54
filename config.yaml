@@ -9,7 +9,7 @@ atr_period: 9
 confidence_threshold: 0.45
 
 # Data
-data_path: "1m"
+data_path: "54"
 sequence_length: 270
 n_ahead: 9
 feature_symbols:
