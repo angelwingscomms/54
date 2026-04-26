@@ -1,3 +1,0 @@
-data.mq5 gets 1min bars (variable timeframe input variable so it can get 1m or 5m and so on - as mt5 has)
-for the 1min case, how many candles should data.mq5 get
-@run.py trains on 1min bars instead of 1hour bars. is any change needed for this?
