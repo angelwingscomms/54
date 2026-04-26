@@ -33,6 +33,7 @@ def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epo
         TimeRemainingColumn(),
         console=console,
     ) as progress:
+        outer_task = progress.add_task("[cyan]Training", total=epochs)
         task = progress.add_task(f"[green]Epochs", total=epochs)
 
         for ep in range(epochs):
@@ -66,6 +67,7 @@ def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epo
                 best_epoch = ep + 1
             
             progress.update(task, advance=1, description=f"[green]Epoch {ep+1}/{epochs}")
+            progress.update(outer_task, advance=1)
 
     elapsed = time.time() - start
     best_val_preds = tkan_apply(best_params, X_va)
