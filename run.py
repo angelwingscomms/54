@@ -7,6 +7,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import pandas as pd
+import yaml
 from tkan import (
     load_config, load_csv, compute_atr, build_samples,
     normalize, save_norm_params, save_config, to_onnx_model, train, eval_loss, tkan_apply,
@@ -158,6 +159,10 @@ def main():
     cfg['input_dim'] = int(input_dim)
     save_norm_params(xmin, xmax, output_dir=str(model_dir))
     save_config(cfg, output_dir=str(model_dir))
+
+    with open(model_dir / 'config.yaml', 'w') as f:
+        yaml.dump(cfg, f, default_flow_style=False)
+    print(f"Saved config.yaml to {model_dir}")
 
     print("\nExporting model to ONNX...")
     to_onnx_model(params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub, output_dir=str(model_dir))
