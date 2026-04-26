@@ -36,6 +36,7 @@ def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epo
         task = progress.add_task(f"[green]Epochs", total=epochs)
 
         for ep in range(epochs):
+            batch_task = progress.add_task("[green]Batches", total=num_batches)
             ep_start = time.time()
             idx = jax.random.permutation(jax.random.key(seed + ep), len(X_tr))
             ep_loss = 0
@@ -47,7 +48,9 @@ def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epo
                 u, opt_st = opt.update(g, opt_st)
                 params = optax.apply_updates(params, u)
                 ep_loss += l
+                progress.update(batch_task, advance=1)
 
+            progress.remove_task(batch_task)
             train_loss = float(ep_loss) / num_batches
             val_loss = eval_loss(params, X_va, y_va)
             
