@@ -86,12 +86,13 @@ def completed_resample(ohlc, minutes):
     shifted = ohlc.copy()
     shifted.index = shifted.index + pd.Timedelta(minutes=1)
     rule = f'{int(minutes)}min'
-    return shifted.resample(rule, label='right', closed='right').agg(
-        {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last'}
-    ).dropna()
+    aggs = {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last'}
+    if 'tick_volume' in ohlc.columns:
+        aggs['tick_volume'] = 'sum'
+    return shifted.resample(rule, label='right', closed='right').agg(aggs).dropna()
 
 
-def align_completed_frame(frame, target_index):
+def align_completed_frame(frame, target_index, has_tick_volume=False):
     aligned = frame.reindex(target_index + pd.Timedelta(minutes=1), method='ffill')
     aligned.index = target_index
     return aligned

@@ -15,6 +15,7 @@ from . import (
     rolling_volatility,
     rsi,
     time_features,
+    tick_volume,
 )
 
 FEATURE_BUILDERS = [
@@ -30,6 +31,7 @@ FEATURE_BUILDERS = [
     ('adx', adx.build),
     ('macd', macd.build),
     ('higher_timeframes', higher_timeframes.build),
+    ('tick_volume', tick_volume.build),
 ]
 
 

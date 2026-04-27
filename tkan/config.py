@@ -29,6 +29,7 @@ def _default_features():
             'macd': {'fast': 12, 'slow': 26, 'signal': 9},
         },
         'time': {'enabled': True, 'hour': True, 'minute': True, 'day_of_week': True},
+        'tick_volume': {'enabled': True, 'timeframes': [15, 60]},
     }
 
 

@@ -1,6 +1,6 @@
 import pandas as pd
 
-OHLC_FIELDS = ('open', 'high', 'low', 'close')
+OHLC_FIELDS = ('open', 'high', 'low', 'close', 'tick_volume')
 
 
 def load_csv(path):
