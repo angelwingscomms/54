@@ -117,7 +117,7 @@ def main():
     print(f"  Test samples:      {len(X_te)}")
     print(f"  Purge gap:         {gap}")
 
-print("\n" + "-"*50)
+    print("\n" + "-"*50)
     print("NORMALIZING DATA (Z-Score with clipping)")
     print("-"*50)
     xmean = X_tr.mean(axis=(0, 1), keepdims=True)
@@ -170,8 +170,8 @@ print("\n" + "-"*50)
         model_dir=model_dir,
         cfg=cfg,
         params=params,
-        xmin=xmin,
-        xmax=xmax,
+        xmean=xmean,
+        xstd=xstd,
         seq_len=seq_len,
         input_dim=input_dim,
         hidden=hidden,

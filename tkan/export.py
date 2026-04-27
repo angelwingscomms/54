@@ -6,15 +6,15 @@ from onnx import TensorProto, helper
 from pathlib import Path
 
 
-def save_norm_params(xmin, xmax, output_dir='.'):
-    xmin = xmin.squeeze()
-    xmax = xmax.squeeze()
-    n = len(xmin)
-    min_str = ", ".join(f"{v:.10g}" for v in xmin)
-    max_str = ", ".join(f"{v:.10g}" for v in xmax)
+def save_norm_params(xmean, xstd, output_dir='.'):
+    xmean = xmean.squeeze()
+    xstd = xstd.squeeze()
+    n = len(xmean)
+    mean_str = ", ".join(f"{v:.10g}" for v in xmean)
+    std_str = ", ".join(f"{v:.10g}" for v in xstd)
     content = (
-        f"const double NORM_MIN[{n}] = {{{min_str}}};\n"
-        f"const double NORM_MAX[{n}] = {{{max_str}}};\n"
+        f"const double NORM_MEAN[{n}] = {{{mean_str}}};\n"
+        f"const double NORM_STD[{n}] = {{{std_str}}};\n"
     )
     path = Path(output_dir) / "norm_params.mqh"
     with open(path, "w") as f:

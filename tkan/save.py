@@ -6,8 +6,8 @@ def save_model_outputs(
     model_dir,
     cfg,
     params,
-    xmin,
-    xmax,
+    xmean,
+    xstd,
     seq_len,
     input_dim,
     hidden,
@@ -28,7 +28,7 @@ def save_model_outputs(
 ):
     from .export import save_norm_params, save_config, to_onnx_model
 
-    save_norm_params(xmin, xmax, output_dir=str(model_dir))
+    save_norm_params(xmean, xstd, output_dir=str(model_dir))
     save_config(cfg, output_dir=str(model_dir))
 
     with open(model_dir / 'config.yaml', 'w') as f:
