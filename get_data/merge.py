@@ -37,6 +37,7 @@ def main():
     dfs = [process_file(f) for f in SOURCE_FILES]
     merged = pd.concat(dfs, ignore_index=True)
     merged = merged.sort_values('datetime', ascending=False)
+    merged.columns = merged.columns.str.lower()
     output_path = f"data/{args.n}.csv"
     merged.to_csv(output_path, index=False)
     print(f"Saved to {output_path}")

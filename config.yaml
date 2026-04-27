@@ -13,6 +13,8 @@ data_path: "54"
 sequence_length: 270
 n_ahead: 9
 feature_symbols:
+  $USDX: true
+  USDJPY: true
   BCHUSD: false
   BTCUSD: true
   ETHUSD: true
