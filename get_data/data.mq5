@@ -1,4 +1,4 @@
-#include "symbols.mq5"
+#include "symbols.mqh"
 
 input int InpBarsToCopy = 30000;
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;
