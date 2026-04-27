@@ -39,7 +39,7 @@ def main():
     merged = merged.sort_values('datetime', ascending=False)
     merged.columns = merged.columns.str.lower()
     output_path = f"data/{args.n}.csv"
-    merged.to_csv(output_path, index=False)
+    merged.to_csv(output_path, index=False, encoding='utf-16')
     print(f"Saved to {output_path}")
 
 if __name__ == '__main__':
