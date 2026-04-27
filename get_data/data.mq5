@@ -1,6 +1,6 @@
-#include "symbols.mqh"
+#include "gold_symbols.mqh"
 
-input int InpBarsToCopy = 30000;
+input int InpBarsToCopy = 144000;
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;
 input string InpOutputFile = "data.csv";
 
