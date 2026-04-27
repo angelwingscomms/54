@@ -1,6 +1,4 @@
-#property copyright "Simple"
-#property version "1.00"
-#property script_show_inputs
+#include "symbols.mq5"
 
 input int InpBarsToCopy = 30000;
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;
@@ -19,13 +17,11 @@ void OnStart() {
    
    FileWrite(fileHandle, "datetime", "symbol", "open", "high", "low", "close");
 
-   string symbolsText = "BCHUSD,BTCUSD,ETHUSD,LTCUSD,XRPUSD,ADAUSD,AVAXUSD,AXSUSD,DOGEUSD,DOTUSD,EOSUSD,FILUSD,LINKUSD,MATICUSD,MIOTAUSD,SOLUSD,TRXUSD,UNIUSD,XLMUSD";
-   string symbols[];
-   int symbolCount = StringSplit(symbolsText, ',', symbols);
+   int symbolCount = ArraySize(SYMBOLS);
    int totalRows = 0;
 
    for(int s = 0; s < symbolCount; s++) {
-      string symbol = symbols[s];
+      string symbol = SYMBOLS[s];
       SymbolSelect(symbol, true);
 
       MqlRates rates[];
