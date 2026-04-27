@@ -8,9 +8,9 @@ SYMBOL_MAP = {
 }
 
 SOURCE_FILES = [
-    'data/$usdx.csv',
-    'data/usdjpy.csv',
-    'data/xauusd.csv',
+    'data/single/$usdx.csv',
+    'data/single/usdjpy.csv',
+    'data/single/xauusd.csv',
 ]
 
 def convert_datetime(date_str, time_str):

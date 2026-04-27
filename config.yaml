@@ -10,14 +10,15 @@ confidence_threshold: 0.27
 
 # Data
 data_path: "xau"
-sequence_length: 270
-n_ahead: 9
+sequence_length: 54
+n_ahead: 54
+
 feature_symbols:
   $USDX: true
   USDJPY: true
   BCHUSD: false
-  BTCUSD: true
-  ETHUSD: true
+  BTCUSD: false
+  ETHUSD: false
   LTCUSD: false
   XRPUSD: false
   ADAUSD: false
