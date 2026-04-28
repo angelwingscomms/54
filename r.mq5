@@ -8,6 +8,7 @@
 #resource "\\Experts\\54\\models\\2804-054612\\model.onnx" as uchar ExtModel[]
 
 input double LotSize = 0.01;
+input double MinDiffPercent = 0.15;
 
 datetime lastBar = 0;
 long gOnnxHandle = INVALID_HANDLE;
@@ -118,39 +119,30 @@ void RunModel() {
    double predictedPrice = predictedRatio * scaler;
    double currentPrice = iClose(gSymbol, PERIOD_CURRENT, 0);
    
-   Print("Predicted ratio: ", predictedRatio, " | Predicted price: ", predictedPrice, " | Current: ", currentPrice);
+Print("Predicted ratio: ", predictedRatio, " | Predicted price: ", predictedPrice, " | Current: ", currentPrice);
+    
+   double diff = MathAbs(predictedPrice - currentPrice);
+   double diffPercent = (diff / currentPrice) * 100;
+   if(diffPercent < MinDiffPercent) {
+      Print("Diff ", diffPercent, "% below threshold ", MinDiffPercent, "% - skipping");
+      return;
+   }
    
    double direction = predictedPrice - currentPrice;
    Print("Direction: ", direction);
-   Trade(direction);
+   Trade(predictedPrice, currentPrice);
 }
 
-void Trade(double direction) {
-   double price = SymbolInfoDouble(gSymbol, SYMBOL_BID);
-   double spread = SymbolInfoInteger(gSymbol, SYMBOL_SPREAD) * SymbolInfoDouble(gSymbol, SYMBOL_POINT);
+void Trade(double predictedPrice, double currentPrice) {
+   double diff = MathAbs(predictedPrice - currentPrice);
+   double tpDistance = diff * 0.80;
+   double slDistance = diff * 0.18;
    
-   if(direction > spread) {
-      if(!PositionSelect(gSymbol)) {
-         double sl = price - 0.5 * spread;
-         double tp = price + 1.0 * spread;
-         MqlTradeRequest req = {};
-         req.action = TRADE_ACTION_DEAL;
-         req.symbol = gSymbol;
-         req.volume = LotSize;
-         req.price = price;
-         req.sl = sl;
-         req.tp = tp;
-         req.type = ORDER_TYPE_SELL;
-         req.comment = "R_BUY";
-         MqlTradeResult res = {};
-         if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE)
-            Print("BUY predicted > current | price=", price, " | SL=", sl, " | TP=", tp);
-      }
-   } else if(direction < -spread) {
+   if(predictedPrice > currentPrice) {
       if(!PositionSelect(gSymbol)) {
          double ask = SymbolInfoDouble(gSymbol, SYMBOL_ASK);
-         double sl = ask + 0.5 * spread;
-         double tp = ask - 1.0 * spread;
+         double sl = currentPrice - slDistance;
+         double tp = currentPrice + tpDistance;
          MqlTradeRequest req = {};
          req.action = TRADE_ACTION_DEAL;
          req.symbol = gSymbol;
@@ -159,10 +151,28 @@ void Trade(double direction) {
          req.sl = sl;
          req.tp = tp;
          req.type = ORDER_TYPE_BUY;
+         req.comment = "R_BUY";
+         MqlTradeResult res = {};
+         if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE)
+            Print("BUY predicted > current | price=", ask, " | SL=", sl, " | TP=", tp);
+      }
+   } else if(predictedPrice < currentPrice) {
+      if(!PositionSelect(gSymbol)) {
+         double bid = SymbolInfoDouble(gSymbol, SYMBOL_BID);
+         double sl = currentPrice + slDistance;
+         double tp = currentPrice - tpDistance;
+         MqlTradeRequest req = {};
+         req.action = TRADE_ACTION_DEAL;
+         req.symbol = gSymbol;
+         req.volume = LotSize;
+         req.price = bid;
+         req.sl = sl;
+         req.tp = tp;
+         req.type = ORDER_TYPE_SELL;
          req.comment = "R_SELL";
          MqlTradeResult res = {};
          if(OrderSend(req, res) && res.retcode == TRADE_RETCODE_DONE)
-            Print("SELL predicted < current | price=", ask, " | SL=", sl, " | TP=", tp);
+            Print("SELL predicted < current | price=", bid, " | SL=", sl, " | TP=", tp);
       }
    }
 }
