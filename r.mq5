@@ -51,13 +51,13 @@ int OnInit() {
 
 bool BuildFeatureRow(const int barShift, double &row[], double predictedClose = 0.0) {
    int offset = 0;
-   double closeVals[];
    for(int s = 0; s < gFeatureCount; s++) {
       string symbol = gFeatureSymbols[s];
       double scaler = iClose(symbol, PERIOD_CURRENT, barShift + CFG_SEQUENCE_LENGTH + 1);
       if(scaler <= 0) {
-         double sum = 0, count = 0;
-         for(int j = 1; j <= 24 * 14; j++) {
+         double sum = 0; int count = 0;
+         int maxBars = MathMin(24 * 14, barShift + CFG_SEQUENCE_LENGTH);
+         for(int j = 1; j <= maxBars; j++) {
             double c = iClose(symbol, PERIOD_CURRENT, barShift + CFG_SEQUENCE_LENGTH + j);
             if(c > 0) { sum += c; count++; }
          }
@@ -93,10 +93,11 @@ void OnTick() {
 void RunModel() {
    double scaler = iClose(gSymbol, PERIOD_CURRENT, 1);
    if(scaler <= 0) {
-      double sum = 0, count = 0;
+      double sum = 0; int count = 0;
       for(int j = 1; j <= 24 * 14; j++) {
          double c = iClose(gSymbol, PERIOD_CURRENT, j);
          if(c > 0) { sum += c; count++; }
+         else break;
       }
       scaler = count > 0 ? sum / count : 1.0;
    }
