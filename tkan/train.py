@@ -9,19 +9,47 @@ from .tkan_apply import tkan_apply
 from .loss import bce_loss, eval_loss
 
 
+def _decay_mask(params):
+    return {
+        'wx': True,
+        'uh': True,
+        'bias': False,
+        'sub_wx': True,
+        'sub_wh': True,
+        'sub_k': False,
+        'agg_w': True,
+        'agg_b': False,
+        'dense_w': True,
+        'dense_b': False,
+    }
+
+
 def train(X_tr, y_tr, X_va, y_va, X_te, y_te, input_dim, hidden=100, sub=20, epochs=27, lr=1e-3, batch_size=128, seed=42):
     console = Console()
+    num_batches = len(range(0, len(X_tr), batch_size))
     key = jax.random.key(seed)
     key, k = jax.random.split(key)
     params = init_tkan(input_dim, hidden, sub, k)
     print(f"Params: {sum(p.size for p in jax.tree_util.tree_leaves(params))}")
 
-    opt = optax.adam(lr)
+    total_steps = max(1, num_batches * epochs)
+    warmup_steps = max(1, int(0.05 * total_steps))
+    schedule = optax.warmup_cosine_decay_schedule(
+        init_value=1e-6,
+        peak_value=lr,
+        warmup_steps=warmup_steps,
+        decay_steps=total_steps,
+        end_value=1e-6,
+    )
+    opt = optax.adamw(
+        learning_rate=schedule,
+        weight_decay=1e-4,
+        mask=_decay_mask,
+    )
     opt_st = opt.init(params)
 
     start = time.time()
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
-    num_batches = len(range(0, len(X_tr), batch_size))
     best_params = params
     best_val_loss = float('inf')
     best_epoch = 0

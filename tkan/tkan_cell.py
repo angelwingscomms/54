@@ -16,7 +16,7 @@ def tkan_cell(params, h, c, x, sub_s, hidden=100, sub=20):
     kx = params['sub_k'][sub:]
     new_sub = kh * sub_o + kx * sub_s
 
-    agg = jnp.dot(sub_o, params['agg_w']) + params['agg_b']
+    agg = jnp.dot(jnp.concatenate([sub_o, h], axis=-1), params['agg_w']) + params['agg_b']
     o = jax.nn.sigmoid(agg)
     h_new = o * jnp.tanh(c_new)
     return h_new, c_new, new_sub

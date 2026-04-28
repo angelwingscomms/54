@@ -47,7 +47,7 @@ DEFAULTS = {
     'hidden_size': 100,
     'sub_dim': 20,
     'batch_size': 128,
-    'learning_rate': 0.01,
+    'learning_rate': 0.0003,
     'epochs': 1,
     'seed': 42,
     'train_test_split': 0.8,
