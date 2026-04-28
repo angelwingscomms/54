@@ -209,6 +209,27 @@ def make_mql5_compatible(path='model.onnx'):
     return path
 
 
+def to_onnx_regression(params, sequence_length=45, input_dim=4, hidden=100, sub=20, output_dir='.'):
+    from .tkan_forward import tkan_fwd
+
+    def make_apply_fn(params_inner):
+        def apply_fn(x):
+            return jnp.dot(tkan_fwd(params_inner, x, hidden), params_inner['dense_w']) + params_inner['dense_b']
+        return apply_fn
+
+    output_path = str(Path(output_dir) / 'model.onnx')
+    to_onnx(
+        make_apply_fn(params),
+        inputs=[jax.ShapeDtypeStruct((1, sequence_length, input_dim), jnp.float32)],
+        model_name='TKAN',
+        return_mode='file',
+        output_path=output_path
+    )
+    make_mql5_compatible(output_path)
+    print(f'Model saved to: {output_path}')
+    return output_path
+
+
 def to_onnx_model(params, sequence_length=45, input_dim=4, hidden=100, sub=20, output_dir='.'):
     from .tkan_forward import tkan_fwd
 
