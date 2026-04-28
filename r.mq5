@@ -22,6 +22,10 @@ int OnInit() {
       Print("Attach r.mq5 to an M1 chart.");
       return INIT_FAILED;
    }
+   if(MinDiffPercent <= 0 || MinDiffPercent > 10) {
+      Print("MinDiffPercent must be > 0 and <= 10. Current: ", MinDiffPercent);
+      return INIT_FAILED;
+   }
    gSymbol = CFG_SYMBOL;
    if(StringLen(gSymbol) == 0) gSymbol = _Symbol;
    SymbolSelect(gSymbol, true);
