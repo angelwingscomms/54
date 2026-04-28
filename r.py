@@ -265,12 +265,10 @@ def main():
     print(f"  Time: {elapsed:.1f}s")
 
     print("\n  Saving model outputs...")
-    from tkan.export import make_mql5_compatible
-    import onnx
-    from jax2onnx import to_onnx
+    from tkan.export import save_norm_params_regression, save_config_regression, to_onnx_regression
 
-    save_norm_params(xmin.squeeze(), xmax.squeeze(), output_dir=str(model_dir))
-    save_config({**cfg, 'input_dim': input_dim}, output_dir=str(model_dir))
+    save_norm_params_regression(xmin.squeeze(), xmax.squeeze(), output_dir=str(model_dir))
+    save_config_regression({**cfg, 'input_dim': input_dim, 'enabled_symbols': symbols}, output_dir=str(model_dir))
 
     with open(model_dir / 'config.yaml', 'w') as f:
         yaml.dump({**cfg, 'input_dim': input_dim}, f, default_flow_style=False)
@@ -307,15 +305,7 @@ def main():
         f.write(notes)
     print(f"  Saved notes.md to {model_dir}")
 
-    output_path = str(model_dir / 'model.onnx')
-    to_onnx(
-        lambda x: apply_fn(best_params, x),
-        inputs=[jax.ShapeDtypeStruct((1, seq_len, input_dim), jnp.float32)],
-        model_name='TKAN',
-        return_mode='file',
-        output_path=output_path,
-    )
-    make_mql5_compatible(output_path)
+    to_onnx_regression(best_params, sequence_length=seq_len, input_dim=input_dim, hidden=hidden, sub=sub, output_dir=str(model_dir))
     print(f"  Saved ONNX to {model_dir}")
 
     expert_path = Path('live.ex5')
@@ -327,6 +317,23 @@ def main():
         ])
         if expert_path.stat().st_mtime < latest_input:
             print("  live.ex5 is older than model. Recompile live.mq5 in MetaEditor.")
+
+    expert_path = Path('live.ex5')
+    r_mq5_path = Path('r.mq5')
+    if expert_path.exists() or r_mq5_path.exists():
+        latest_input = max(path.stat().st_mtime for path in [
+            model_dir / 'model.onnx',
+            model_dir / 'config.mqh',
+            model_dir / 'norm_params.mqh',
+        ])
+        if r_mq5_path.exists() and r_mq5_path.stat().st_mtime < latest_input:
+            content = r_mq5_path.read_text()
+            ts = model_dir.name
+            content = content.replace('#include "models/DDMM-HHMMSS/config.mqh"', f'#include "models/{ts}/config.mqh"')
+            content = content.replace('#include "models/DDMM-HHMMSS/norm_params.mqh"', f'#include "models/{ts}/norm_params.mqh"')
+            content = content.replace('#resource "\\\\Experts\\\\54\\\\models\\\\DDMM-HHMMSS\\\\model.onnx"', f'#resource "\\\\Experts\\\\54\\\\models\\\\{ts}\\\\model.onnx"')
+            r_mq5_path.write_text(content)
+            print("  r.mq5 updated to use model: ", ts)
 
     print("\n  Committing model to git...")
     subprocess.run(['git', 'add', '.'], check=True)

@@ -22,6 +22,22 @@ def save_norm_params(xmean, xstd, output_dir='.'):
     print(f"Saved norm_params.mqh ({n} features) to {path.parent}")
 
 
+def save_norm_params_regression(xmin, xmax, output_dir='.'):
+    xmin = xmin.squeeze()
+    xmax = xmax.squeeze()
+    n = len(xmin)
+    min_str = ", ".join(f"{v:.10g}" for v in xmin)
+    max_str = ", ".join(f"{v:.10g}" for v in xmax)
+    content = (
+        f"const double NORM_MIN[{n}] = {{{min_str}}};\n"
+        f"const double NORM_MAX[{n}] = {{{max_str}}};\n"
+    )
+    path = Path(output_dir) / "norm_params.mqh"
+    with open(path, "w") as f:
+        f.write(content)
+    print(f"Saved norm_params.mqh ({n} features) to {path.parent}")
+
+
 def save_config(cfg, output_dir='.'):
     def fmt(value):
         if isinstance(value, bool):
@@ -207,6 +223,31 @@ def make_mql5_compatible(path='model.onnx'):
     onnx.save(model, path)
     print(f'Saved MQL5-compatible ONNX: {path}')
     return path
+
+
+def save_config_regression(cfg, output_dir='.'):
+    def fmt(value):
+        if isinstance(value, float):
+            return f'{value:.10g}'
+        return str(value)
+
+    def add_scalar(name, mql_type, value):
+        content.append(f'const {mql_type} {name} = {fmt(value)};')
+
+    content = []
+    add_scalar('CFG_SYMBOL', 'string', cfg.get('symbol', ''))
+    add_scalar('CFG_SEQUENCE_LENGTH', 'int', cfg.get('sequence_length', 54))
+    add_scalar('CFG_INPUT_DIM', 'int', cfg.get('input_dim', 3))
+
+    symbols = cfg.get('enabled_symbols', [])
+    if not symbols:
+        symbols = [cfg.get('symbol', 'XAUUSD')]
+    add_scalar('CFG_FEATURE_SYMBOLS', 'string', ','.join(symbols))
+
+    path = Path(output_dir) / 'config.mqh'
+    with open(path, 'w') as f:
+        f.write('\n'.join(content))
+    print(f'Saved regression config.mqh to {path.parent}')
 
 
 def to_onnx_regression(params, sequence_length=45, input_dim=4, hidden=100, sub=20, output_dir='.'):
