@@ -128,7 +128,7 @@ Print("Predicted ratio: ", predictedRatio, " | Predicted price: ", predictedPric
    double diff = MathAbs(predictedPrice - currentPrice);
    double diffPercent = (diff / currentPrice) * 100;
    if(diffPercent < MinDiffPercent) {
-      Print("Diff ", diffPercent, "% below threshold ", MinDiffPercent, "% - skipping");
+      PrintError("Diff ", diffPercent, "% below threshold ", MinDiffPercent, "% - skipping");
       return;
    }
    
