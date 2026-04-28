@@ -9,6 +9,7 @@
 
 input double LotSize = 0.01;
 input double MinDiffPercent = 0.15;
+input int NAhead = 9;
 
 datetime lastBar = 0;
 long gOnnxHandle = INVALID_HANDLE;
@@ -48,7 +49,7 @@ int OnInit() {
    return INIT_SUCCEEDED;
 }
 
-bool BuildFeatureRow(const int barShift, double &row[]) {
+bool BuildFeatureRow(const int barShift, double &row[], double predictedClose = 0.0) {
    int offset = 0;
    double closeVals[];
    for(int s = 0; s < gFeatureCount; s++) {
@@ -62,8 +63,14 @@ bool BuildFeatureRow(const int barShift, double &row[]) {
          }
          scaler = count > 0 ? sum / count : 1.0;
       }
-      for(int i = 0; i < CFG_SEQUENCE_LENGTH; i++) {
-         double close = iClose(symbol, PERIOD_CURRENT, barShift + i);
+      for(int i = 0; i < CFG_SEQUENCE_LENGTH - 1; i++) {
+         double close = iClose(symbol, PERIOD_CURRENT, barShift + i + 1);
+         row[offset++] = (close > 0 && scaler > 0) ? close / scaler : 1.0;
+      }
+      if(predictedClose > 0 && symbol == gSymbol) {
+         row[offset++] = predictedClose / scaler;
+      } else {
+         double close = iClose(symbol, PERIOD_CURRENT, barShift);
          row[offset++] = (close > 0 && scaler > 0) ? close / scaler : 1.0;
       }
    }
@@ -84,32 +91,6 @@ void OnTick() {
 }
 
 void RunModel() {
-   int numCandles = CFG_SEQUENCE_LENGTH;
-   matrixf x(numCandles, CFG_INPUT_DIM);
-   for(int i = 0; i < numCandles; i++) {
-      int bar = numCandles - i;
-      double row[];
-      ArrayResize(row, CFG_INPUT_DIM);
-      if(!BuildFeatureRow(bar, row)) { Print("Feature build failed at shift ", bar); return; }
-      for(int col = 0; col < CFG_INPUT_DIM; col++)
-         x[i, col] = (float)row[col];
-   }
-
-   for(int f = 0; f < CFG_INPUT_DIM; f++) {
-      double range = NORM_MAX[f] - NORM_MIN[f];
-      if(range < 1e-8) range = 1e-8;
-      for(int i = 0; i < numCandles; i++)
-         x[i, f] = (float)((x[i, f] - NORM_MIN[f]) / range);
-   }
-
-   vectorf y(1);
-   matrixf x3d = x;
-   x3d.Resize(1, numCandles * CFG_INPUT_DIM);
-   if(!OnnxRun(gOnnxHandle, 0, x3d, y)) { Print("ONNX run failed: ", GetLastError()); return; }
-   
-   double predictedRatio = (double)y[0];
-   if(!MathIsValidNumber(predictedRatio)) { Print("Invalid ONNX output: ", predictedRatio); return; }
-   
    double scaler = iClose(gSymbol, PERIOD_CURRENT, 1);
    if(scaler <= 0) {
       double sum = 0, count = 0;
@@ -119,19 +100,57 @@ void RunModel() {
       }
       scaler = count > 0 ? sum / count : 1.0;
    }
-   
-   double predictedPrice = predictedRatio * scaler;
+
+   double predictedPrices[];
+   ArrayResize(predictedPrices, NAhead);
+   double predictedClose = 0.0;
+
+   for(int h = 0; h < NAhead; h++) {
+      int numCandles = CFG_SEQUENCE_LENGTH;
+      matrixf x(numCandles, CFG_INPUT_DIM);
+      for(int i = 0; i < numCandles; i++) {
+         int bar = numCandles - i + h + 1;
+         double row[];
+         ArrayResize(row, CFG_INPUT_DIM);
+         if(!BuildFeatureRow(bar, row, predictedClose)) {
+            Print("Feature build failed at shift ", bar); return;
+         }
+         for(int col = 0; col < CFG_INPUT_DIM; col++)
+            x[i, col] = (float)row[col];
+      }
+
+      for(int f = 0; f < CFG_INPUT_DIM; f++) {
+         double range = NORM_MAX[f] - NORM_MIN[f];
+         if(range < 1e-8) range = 1e-8;
+         for(int i = 0; i < numCandles; i++)
+            x[i, f] = (float)((x[i, f] - NORM_MIN[f]) / range);
+      }
+
+      vectorf y(1);
+      matrixf x3d = x;
+      x3d.Resize(1, numCandles * CFG_INPUT_DIM);
+      if(!OnnxRun(gOnnxHandle, 0, x3d, y)) { Print("ONNX run failed: ", GetLastError()); return; }
+      
+      double predictedRatio = (double)y[0];
+      if(!MathIsValidNumber(predictedRatio)) { Print("Invalid ONNX output: ", predictedRatio); return; }
+      
+      predictedClose = predictedRatio * scaler;
+      predictedPrices[h] = predictedClose;
+      Print("h=", h, " | predicted ratio=", predictedRatio, " | price=", predictedClose);
+   }
+
+   double predictedPrice = predictedPrices[NAhead - 1];
    double currentPrice = iClose(gSymbol, PERIOD_CURRENT, 0);
-   
-Print("Predicted ratio: ", predictedRatio, " | Predicted price: ", predictedPrice, " | Current: ", currentPrice);
     
+   Print("Final: NAhead=", NAhead, " | Predicted: ", predictedPrice, " | Current: ", currentPrice);
+     
    double diff = MathAbs(predictedPrice - currentPrice);
    double diffPercent = (diff / currentPrice) * 100;
    if(diffPercent < MinDiffPercent) {
-      PrintError("Diff ", diffPercent, "% below threshold ", MinDiffPercent, "% - skipping");
+      Print("Diff ", diffPercent, "% below threshold ", MinDiffPercent, "% - skipping");
       return;
    }
-   
+    
    double direction = predictedPrice - currentPrice;
    Print("Direction: ", direction);
    Trade(predictedPrice, currentPrice);
