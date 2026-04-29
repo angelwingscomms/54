@@ -2,10 +2,10 @@
 #property version "1.00"
 #property strict
 
-#include "models/2804-054612/config.mqh"
-#include "models/2804-054612/norm_params.mqh"
+#include "models/2904-100238/config.mqh"
+#include "models/2904-100238/norm_params.mqh"
 
-#resource "\\Experts\\54\\models\\2804-054612\\model.onnx" as uchar ExtModel[]
+#resource "\Experts\54\models\2904-100238\model.onnx" as uchar ExtModel[]
 
 input double LotSize = 0.01;
 input double MinDiffPercent = 0.15;
