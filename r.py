@@ -3,6 +3,7 @@ import os
 os.environ['JAX_CPU_COLLECTIVE_IMPL_HEADER_ONLY'] = '1'
 
 import argparse
+import re
 import yaml
 import time
 import subprocess
@@ -296,22 +297,30 @@ def main():
         if expert_path.stat().st_mtime < latest_input:
             print("  live.ex5 is older than model. Recompile live.mq5 in MetaEditor.")
 
-    expert_path = Path('live.ex5')
     r_mq5_path = Path('r.mq5')
-    if expert_path.exists() or r_mq5_path.exists():
-        latest_input = max(path.stat().st_mtime for path in [
-            model_dir / 'model.onnx',
-            model_dir / 'config.mqh',
-            model_dir / 'norm_params.mqh',
-        ])
-        if r_mq5_path.exists() and r_mq5_path.stat().st_mtime < latest_input:
-            content = r_mq5_path.read_text()
-            ts = model_dir.name
-            content = content.replace('#include "models/DDMM-HHMMSS/config.mqh"', f'#include "models/{ts}/config.mqh"')
-            content = content.replace('#include "models/DDMM-HHMMSS/norm_params.mqh"', f'#include "models/{ts}/norm_params.mqh"')
-            content = content.replace('#resource "\\\\Experts\\\\54\\\\models\\\\DDMM-HHMMSS\\\\model.onnx"', f'#resource "\\\\Experts\\\\54\\\\models\\\\{ts}\\\\model.onnx"')
-            r_mq5_path.write_text(content)
-            print("  r.mq5 updated to use model: ", ts)
+    if r_mq5_path.exists():
+        content = r_mq5_path.read_text()
+        ts = model_dir.name
+        ts_pattern = r'\d{4}-\d{6}'
+
+        content = re.sub(
+            rf'#include "models/{ts_pattern}/config.mqh"',
+            f'#include "models/{ts}/config.mqh"',
+            content
+        )
+        content = re.sub(
+            rf'#include "models/{ts_pattern}/norm_params.mqh"',
+            f'#include "models/{ts}/norm_params.mqh"',
+            content
+        )
+        content = re.sub(
+            rf'#resource "\\\\Experts\\\\54\\\\models\\\\{ts_pattern}\\\\model\.onnx"',
+            f'#resource "\\\\Experts\\\\54\\\\models\\\\{ts}\\\\model.onnx"',
+            content
+        )
+
+        r_mq5_path.write_text(content)
+        print(f"  r.mq5 updated to use model: {ts}")
 
     print("\n  Committing model to git...")
     subprocess.run(['git', 'add', '.'], check=True)
