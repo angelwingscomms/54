@@ -255,7 +255,7 @@ def to_onnx_regression(params, sequence_length=45, input_dim=4, hidden=100, sub=
 
     def make_apply_fn(params_inner):
         def apply_fn(x):
-            return jnp.dot(tkan_fwd(params_inner, x, hidden), params_inner['dense_w']) + params_inner['dense_b']
+            return jnp.dot(tkan_fwd(params_inner, x, hidden, sub), params_inner['dense_w']) + params_inner['dense_b']
         return apply_fn
 
     output_path = str(Path(output_dir) / 'model.onnx')
@@ -276,7 +276,7 @@ def to_onnx_model(params, sequence_length=45, input_dim=4, hidden=100, sub=20, o
 
     def make_apply_fn(params_inner):
         def apply_fn(x):
-            return jax.nn.sigmoid(jnp.dot(tkan_fwd(params_inner, x, hidden), params_inner['dense_w']) + params_inner['dense_b'])
+            return jax.nn.sigmoid(jnp.dot(tkan_fwd(params_inner, x, hidden, sub), params_inner['dense_w']) + params_inner['dense_b'])
         return apply_fn
 
     output_path = str(Path(output_dir) / 'model.onnx')

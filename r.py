@@ -14,12 +14,7 @@ import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import optax
-from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
-from rich.console import Console
-
 jax.default_backend = 'cpu'
-
-console = Console()
 
 
 def load_config(path='r.yaml'):
@@ -170,7 +165,7 @@ def main():
 
     from tkan.tkan_init import init_tkan
     from tkan.tkan_forward import tkan_fwd
-    from tkan.export import save_norm_params, save_config, to_onnx_regression
+    from tkan.export import save_norm_params_regression, save_config_regression, to_onnx_regression
 
     hidden, sub = cfg['hidden_size'], cfg['sub_dim']
     input_dim = int(X_tr.shape[-1])
@@ -215,39 +210,23 @@ def main():
     start = time.time()
     num_batches = len(range(0, len(X_tr), bs))
 
-    with Progress(
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(bar_width=20, complete_style="green"),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TimeRemainingColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("[green]Epochs", total=epochs)
-
-        for ep in range(epochs):
-            batch_task = progress.add_task("[green]Batches", total=num_batches)
-            idx = jax.random.permutation(jax.random.key(seed + ep), len(X_tr))
-            ep_loss = 0.0
-
-            for i in range(0, len(X_tr), bs):
-                b = idx[i:i + bs]
-                params, opt_st, l = step(params, opt_st, X_tr[b], y_tr[b])
-                ep_loss += float(l)
-                progress.update(batch_task, advance=1)
-
-            progress.remove_task(batch_task)
-            train_loss = ep_loss / num_batches
-            val_loss = float(mse_loss(params, X_va, y_va))
-
-            train_losses.append(train_loss)
-            val_losses.append(val_loss)
-            print(f"  epoch {ep + 1} | trainloss {train_loss:.4f} | valloss {val_loss:.4f}")
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
-                best_params = params
-                best_epoch = ep + 1
-
-            progress.update(task, advance=1, description=f"[green]Epoch {ep + 1}/{epochs}")
+    for ep in range(epochs):
+        idx = jax.random.permutation(jax.random.key(seed + ep), len(X_tr))
+        ep_loss = 0.0
+        for i in range(0, len(X_tr), bs):
+            b = idx[i:i + bs]
+            params, opt_st, l = step(params, opt_st, X_tr[b], y_tr[b])
+            ep_loss += float(l)
+        train_loss = ep_loss / num_batches
+        val_loss = float(mse_loss(params, X_va, y_va))
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+        elapsed = time.time() - start
+        print(f" epoch {ep+1}/{epochs} | train {train_loss:.6f} | val {val_loss:.6f} | {elapsed:.0f}s")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            best_params = params
+            best_epoch = ep + 1
 
     elapsed = time.time() - start
 
@@ -263,9 +242,8 @@ def main():
     print(f"  Test RMSE: {test_rmse:.4f}")
     print(f"  Test R2: {test_r2:.4f}")
     print(f"  Time: {elapsed:.1f}s")
+    print("\n Saving model outputs...")
 
-    print("\n  Saving model outputs...")
-    from tkan.export import save_norm_params_regression, save_config_regression, to_onnx_regression
 
     save_norm_params_regression(xmin.squeeze(), xmax.squeeze(), output_dir=str(model_dir))
     save_config_regression({**cfg, 'input_dim': input_dim, 'enabled_symbols': symbols}, output_dir=str(model_dir))
