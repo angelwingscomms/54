@@ -5,7 +5,7 @@
 #include "models/2904-100238/config.mqh"
 #include "models/2904-100238/norm_params.mqh"
 
-#resource "\Experts\54\models\2904-100238\model.onnx" as uchar ExtModel[]
+#resource "\\Experts\\54\\models\\2904-100238\\model.onnx" as const uchar ExtModel[195458]
 
 input double LotSize = 0.01;
 input double MinDiffPercent = 0.15;
