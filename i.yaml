@@ -1,0 +1,34 @@
+# ── data ─────────────────────────────────────────────────────────────────────
+data_path: data/xau          # reads xau.csv from current directory
+symbol: XAUUSD          # primary symbol to predict (must be in the CSV)
+
+# which OHLCV column(s) to use as features.
+# Can be a single string or a list: [open, high, low, close, tick_volume]
+features: close
+
+# additional symbols to use as input features (must be in the same CSV)
+feature_symbols:
+  $USDX: true
+  USDJPY: true
+
+# ── sequence / forecast horizon ───────────────────────────────────────────────
+sequence_length: 54     # look-back window (bars)
+n_ahead: 1              # how many bars ahead to predict
+
+# rolling-median normalisation window (days × 24 hours)
+rolling_days: 14
+
+# ── model ─────────────────────────────────────────────────────────────────────
+model: TKAN             # TKAN | GRU | LSTM
+hidden_units: 100
+
+# ── training ──────────────────────────────────────────────────────────────────
+epochs: 1000            # max epochs (early stopping will kick in earlier)
+batch_size: 128
+lr: 0.001
+seed: 42
+
+# ── backend & export ──────────────────────────────────────────────────────────
+backend: jax     # tensorflow (recommended) | jax | torch
+onnx_opset: 13          # opset 13 is well-supported by MT5
+output_path: model.onnx

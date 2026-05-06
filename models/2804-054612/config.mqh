@@ -1,4 +1,0 @@
-const string CFG_SYMBOL = "XAUUSD";
-const int CFG_SEQUENCE_LENGTH = 54;
-const int CFG_INPUT_DIM = 3;
-const string CFG_FEATURE_SYMBOLS = "XAUUSD,$USDX,USDJPY";
