@@ -1,44 +1,166 @@
 """
-TKAN crypto volume forecasting.
-Backend: PyTorch (KERAS_BACKEND=torch)
-Exports model.onnx + norm_params.mqh + config.mqh to ./model/
+train.py — TKAN multi-symbol cryptocurrency / forex trading model
+=================================================================
+* Connects to MetaTrader 5 to fetch historical hourly OHLCV data
+* Trains a two-layer TKAN network (no TensorFlow — torch backend)
+* Exports the trained model to ONNX (model.onnx)
+* Saves per-feature normalisation params (scaler_params.csv + .json)
 
-Install deps:
-    pip install keras tkan torch onnx pandas pyarrow
+Dependencies (install once):
+    pip install MetaTrader5 tkan keras torch onnx scikit-learn numpy pandas
+
+IMPORTANT
+  – Copy model.onnx  →  <MT5 data folder>/MQL5/Files/
+  – Copy scaler_params.csv → same folder (or terminal's common Files/)
 """
 
-import os
-import time
-import shutil
+import os, json, time
 import numpy as np
 import pandas as pd
 
-# ── Must set backend before importing keras ───────────────────────────────────
-os.environ.setdefault("KERAS_BACKEND", "torch")
+# ── Use PyTorch backend — NO TensorFlow ──────────────────────────────────────
+os.environ["KERAS_BACKEND"] = "torch"
 
+import torch
 import keras
 from keras.models import Sequential
-from keras.layers import Input, Dense
+from keras.layers import Dense, Input
 from tkan import TKAN
 
-os.makedirs("model", exist_ok=True)
+import MetaTrader5 as mt5
+from sklearn.metrics import r2_score, root_mean_squared_error
 
-# ── constants ─────────────────────────────────────────────────────────────────
-SEQUENCE_LENGTH = 45
-N_AHEAD         = 1
-BATCH_SIZE      = 128
-N_MAX_EPOCHS    = 1000
-ASSETS = [
-    "BTC", "ETH", "ADA", "XMR", "EOS", "MATIC", "TRX",
-    "FTM", "BNB", "XLM", "ENJ", "CHZ", "BUSD", "ATOM",
-    "LINK", "ETC", "XRP", "BCH", "LTC",
+# ── Configuration ─────────────────────────────────────────────────────────────
+
+# All 21 symbols requested (broker symbol names may vary — edit if needed)
+SYMBOLS: list[str] = [
+    "$USDX",   "USDJPY",  "BCHUSD",  "BTCUSD",  "ETHUSD",
+    "LTCUSD",  "XRPUSD",  "ADAUSD",  "AVAXUSD", "AXSUSD",
+    "DOGEUSD", "DOTUSD",  "EOSUSD",  "FILUSD",  "LINKUSD",
+    "MATICUSD","MIOTAUSD","SOLUSD",  "TRXUSD",  "UNIUSD",
+    "XLMUSD",
 ]
+
+PRIMARY_SYMBOL  = "BTCUSD"   # symbol the EA will trade
+TIMEFRAME       = mt5.TIMEFRAME_H1
+N_BARS          = 26_304      # ~3 years of hourly bars
+SEQUENCE_LEN    = 45          # look-back window
+N_AHEAD         = 1           # bars ahead to predict
+BATCH_SIZE      = 128
+MAX_EPOCHS      = 1_000
+
+OUT_ONNX        = "model.onnx"
+OUT_SCALER_CSV  = "scaler_params.csv"
+OUT_SCALER_JSON = "scaler_params.json"
 
 keras.utils.set_random_seed(42)
 
 
-# ── callbacks ─────────────────────────────────────────────────────────────────
-def make_callbacks():
+# ── MT5 helpers ───────────────────────────────────────────────────────────────
+
+def init_mt5() -> None:
+    if not mt5.initialize():
+        raise RuntimeError(f"mt5.initialize() failed: {mt5.last_error()}")
+    info = mt5.terminal_info()
+    print(f"MT5 connected: {info.name}  build={info.build}")
+
+
+def fetch_closes(symbols: list[str]) -> pd.DataFrame:
+    """
+    Pull close prices for every symbol; unavailable symbols are filled
+    with NaN then replaced with 0 so the model always sees N=21 features.
+    """
+    series: dict[str, pd.Series] = {}
+    for sym in symbols:
+        rates = mt5.copy_rates_from_pos(sym, TIMEFRAME, 0, N_BARS)
+        if rates is None or len(rates) < SEQUENCE_LEN + 100:
+            n = 0 if rates is None else len(rates)
+            print(f"  [skip] {sym:>12s}  ({n} bars — unavailable / too short)")
+            series[sym] = pd.Series(dtype=float, name=sym)
+            continue
+        df = pd.DataFrame(rates)[["time", "close"]]
+        df["time"] = pd.to_datetime(df["time"], unit="s")
+        df.set_index("time", inplace=True)
+        series[sym] = df["close"].rename(sym)
+        print(f"  [ok]   {sym:>12s}  ({len(df)} bars)")
+
+    combined = pd.DataFrame(series)          # aligns on common timestamps
+    combined.sort_index(inplace=True)
+
+    # Fill unavailable symbols with 0 so we keep exactly len(symbols) cols
+    combined.fillna(0.0, inplace=True)
+
+    # Drop rows where ALL values are 0 (no data at all for that timestamp)
+    combined = combined[(combined != 0).any(axis=1)]
+    return combined[symbols]                 # enforce original column order
+
+
+# ── Preprocessing ─────────────────────────────────────────────────────────────
+
+def log_returns(prices: pd.DataFrame) -> pd.DataFrame:
+    """Log-return; rows where price is 0 yield 0 (not NaN) via masking."""
+    p = prices.replace(0.0, np.nan)
+    lr = np.log(p / p.shift(1))
+    lr.fillna(0.0, inplace=True)
+    return lr.iloc[1:]                       # drop first NaN row
+
+
+class MinMaxScaler:
+    """Feature-wise [0, 1] scaler fitted only on training data."""
+
+    def __init__(self):
+        self.min_: np.ndarray | None = None
+        self.max_: np.ndarray | None = None
+
+    def fit(self, X: np.ndarray) -> "MinMaxScaler":
+        self.min_ = X.min(axis=0)
+        self.max_ = X.max(axis=0)
+        return self
+
+    def _scale(self) -> np.ndarray:
+        sc = self.max_ - self.min_
+        sc[sc == 0] = 1.0                    # avoid division by zero
+        return sc
+
+    def transform(self, X: np.ndarray) -> np.ndarray:
+        return (X - self.min_) / self._scale()
+
+    def fit_transform(self, X: np.ndarray) -> np.ndarray:
+        return self.fit(X).transform(X)
+
+
+def make_sequences(
+    data: np.ndarray, target_col: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sliding-window: X → [batch, SEQUENCE_LEN, features], y → [batch, N_AHEAD]."""
+    X, y = [], []
+    for i in range(SEQUENCE_LEN, len(data) - N_AHEAD + 1):
+        X.append(data[i - SEQUENCE_LEN : i])
+        y.append(data[i : i + N_AHEAD, target_col])
+    return (np.asarray(X, dtype=np.float32),
+            np.asarray(y, dtype=np.float32))
+
+
+# ── Model ─────────────────────────────────────────────────────────────────────
+
+def build_tkan(n_features: int) -> keras.Model:
+    model = Sequential(
+        [
+            Input(shape=(SEQUENCE_LEN, n_features)),
+            TKAN(100, return_sequences=True),
+            TKAN(100, sub_kan_output_dim=20, sub_kan_input_dim=20,
+                 return_sequences=False),
+            Dense(N_AHEAD, activation="linear"),
+        ],
+        name="TKAN",
+    )
+    model.compile(optimizer=keras.optimizers.Adam(1e-3),
+                  loss="mean_squared_error")
+    model.summary()
+    return model
+
+
+def callbacks() -> list:
     return [
         keras.callbacks.EarlyStopping(
             monitor="val_loss", min_delta=1e-5, patience=10,
@@ -52,331 +174,141 @@ def make_callbacks():
     ]
 
 
-# ── scaler ────────────────────────────────────────────────────────────────────
-class MinMaxScaler:
-    def __init__(self, feature_axis=None, minmax_range=(0, 1)):
-        self.feature_axis = feature_axis
-        self.min_ = self.max_ = self.scale_ = None
-        self.minmax_range = minmax_range
+# ── ONNX export (torch backend → torch.onnx) ──────────────────────────────────
 
-    def fit(self, X):
-        if X.ndim == 3 and self.feature_axis is not None:
-            axis = tuple(i for i in range(X.ndim) if i != self.feature_axis)
-            self.min_ = np.min(X, axis=axis)
-            self.max_ = np.max(X, axis=axis)
-        elif X.ndim == 2:
-            self.min_ = np.min(X, axis=0)
-            self.max_ = np.max(X, axis=0)
-        else:
-            self.min_ = np.min(X)
-            self.max_ = np.max(X)
-        self.scale_ = self.max_ - self.min_
-        return self
+def export_onnx(model: keras.Model, n_features: int) -> None:
+    """Wrap the Keras/torch model and export via torch.onnx."""
 
-    def transform(self, X):
-        X_s = (X - self.min_) / self.scale_
-        return X_s * (self.minmax_range[1] - self.minmax_range[0]) + self.minmax_range[0]
-
-    def fit_transform(self, X):
-        return self.fit(X).transform(X)
-
-    def inverse_transform(self, X_s):
-        X = (X_s - self.minmax_range[0]) / (self.minmax_range[1] - self.minmax_range[0])
-        return X * self.scale_ + self.min_
-
-
-# ── data ──────────────────────────────────────────────────────────────────────
-def generate_data(df, sequence_length, n_ahead=1):
-    scaler_df = df.copy().shift(n_ahead).rolling(24 * 14).median()
-    tmp_df    = df.copy() / scaler_df
-    tmp_df    = tmp_df.iloc[24 * 14 + n_ahead:].fillna(0.0)
-    scaler_df = scaler_df.iloc[24 * 14 + n_ahead:].fillna(0.0)
-
-    X, y, y_sc = [], [], []
-    for i in range(sequence_length, len(tmp_df) - n_ahead + 1):
-        X.append(tmp_df.iloc[i - sequence_length:i].values)
-        y.append(tmp_df.iloc[i:i + n_ahead, 0:1].values)
-        y_sc.append(scaler_df.iloc[i:i + n_ahead, 0:1].values)
-    X, y, y_sc = np.array(X), np.array(y), np.array(y_sc)
-
-    split = int(len(X) * 0.8)
-    X_tr_raw, X_te_raw = X[:split], X[split:]
-    y_tr_raw, y_te_raw = y[:split], y[split:]
-
-    xs = MinMaxScaler(feature_axis=2)
-    X_train = xs.fit_transform(X_tr_raw)
-    X_test  = xs.transform(X_te_raw)
-
-    ys = MinMaxScaler(feature_axis=2)
-    y_train = ys.fit_transform(y_tr_raw).reshape(len(y_tr_raw), -1)
-    y_test  = ys.transform(y_te_raw).reshape(len(y_te_raw), -1)
-
-    return xs, X_train, X_test, ys, y_train, y_test
-
-
-# ── norm / config helpers ─────────────────────────────────────────────────────
-def save_norm_params(xmin, xmax, out_dir="model"):
-    xmin = np.array(xmin).squeeze()
-    xmax = np.array(xmax).squeeze()
-    n = len(xmin)
-    content = (
-        f"const double NORM_MIN[{n}] = {{{', '.join(f'{v:.10g}' for v in xmin)}}};\n"
-        f"const double NORM_MAX[{n}] = {{{', '.join(f'{v:.10g}' for v in xmax)}}};\n"
-    )
-    path = os.path.join(out_dir, "norm_params.mqh")
-    with open(path, "w") as f:
-        f.write(content)
-    print(f"Saved {path}  ({n} features)")
-
-
-def save_config(n_features, sequence_length, n_ahead, out_dir="model"):
-    lines = [
-        f"const int    CFG_SEQUENCE_LENGTH = {sequence_length};",
-        f"const int    CFG_INPUT_DIM       = {n_features};",
-        f"const int    CFG_N_AHEAD         = {n_ahead};",
-        f"const double CFG_LOT_SIZE        = 0.01;",
-        f"const double CFG_STOP_LOSS_PCT   = 0.02;",
-        f"const double CFG_TAKE_PROFIT_PCT = 0.04;",
-    ]
-    path = os.path.join(out_dir, "config.mqh")
-    with open(path, "w") as f:
-        f.write("\n".join(lines) + "\n")
-    print(f"Saved {path}")
-
-
-# ── ONNX helpers ──────────────────────────────────────────────────────────────
-def _get_shape(vi):
-    dims = []
-    for d in vi.type.tensor_type.shape.dim:
-        if not d.HasField("dim_value"):
-            return None
-        dims.append(int(d.dim_value))
-    return dims
-
-
-def _set_shape(vi, shape):
-    dims = vi.type.tensor_type.shape.dim
-    del dims[:]
-    for s in shape:
-        dims.add().dim_value = int(s)
-
-
-def _make_mql5_compatible(path):
-    """
-    Flatten the 3-D input (batch, seq, features) → 2-D (batch, seq*features)
-    so MQL5's ONNX runtime can feed a plain float array.
-    A Reshape node is prepended inside the graph to restore the 3-D view.
-    """
-    import onnx
-    from onnx import TensorProto, helper
-
-    model = onnx.load(path)
-    graph = model.graph
-    if not graph.input:
-        return path
-
-    mi     = graph.input[0]
-    iname  = mi.name
-    legacy = f"{iname}_internal"
-    ishape = _get_shape(mi)
-
-    # Already 2-D and no legacy input — nothing to do
-    if ishape and len(ishape) == 2 and not any(v.name == legacy for v in graph.input[1:]):
-        return path
-
-    # Determine the true 3-D shape
-    src_shape = ishape if (ishape and len(ishape) == 3) else None
-    legacy_shape_inputs = set()
-    keep_nodes = []
-
-    for node in graph.node:
-        is_legacy_reshape = (
-            node.op_type == "Reshape"
-            and len(node.input) == 2
-            and node.input[0] == iname
-            and len(node.output) == 1
-            and node.output[0] == legacy
-        )
-        if is_legacy_reshape:
-            legacy_shape_inputs.add(node.input[1])
-        else:
-            keep_nodes.append(node)
-
-    if src_shape is None:
-        for v in graph.input[1:]:
-            if v.name == legacy:
-                src_shape = _get_shape(v)
-                break
-
-    if src_shape is None or len(src_shape) != 3:
-        print("Warning: could not patch ONNX for MQL5 compatibility")
-        return path
-
-    flat_shape    = [src_shape[0], src_shape[1] * src_shape[2]]
-    reshaped_out  = f"{iname}_reshaped"
-    shape_const   = "shape_const"
-
-    keep_init = [i for i in graph.initializer if i.name not in legacy_shape_inputs]
-    keep_vi   = [v for v in graph.value_info if v.name not in {legacy, *legacy_shape_inputs}]
-
-    shape_tensor = helper.make_tensor("shape_const_value", TensorProto.INT64, [len(src_shape)], src_shape)
-    const_node   = helper.make_node("Constant", inputs=[], outputs=[shape_const], value=shape_tensor)
-    reshape_node = helper.make_node("Reshape", inputs=[iname, shape_const], outputs=[reshaped_out])
-
-    _set_shape(mi, flat_shape)
-    del graph.input[1:]
-    del graph.initializer[:]
-    graph.initializer.extend(keep_init)
-    del graph.value_info[:]
-    graph.value_info.extend(keep_vi)
-
-    fixed = []
-    for node in keep_nodes:
-        updated = [reshaped_out if n in (iname, legacy) else n for n in node.input]
-        del node.input[:]
-        node.input.extend(updated)
-        fixed.append(node)
-
-    del graph.node[:]
-    graph.node.extend([const_node, reshape_node, *fixed])
-
-    onnx.checker.check_model(model)
-    onnx.save(model, path)
-    print(f"Saved MQL5-compatible ONNX: {path}")
-    return path
-
-
-def export_onnx_torch(model, sequence_length, n_features, out_dir="model"):
-    """
-    Export a Keras-on-PyTorch model to ONNX using torch.onnx.export.
-
-    Strategy:
-      1. Extract the underlying torch.nn.Module from the Keras model.
-      2. Trace it with a dummy input.
-      3. Export via torch.onnx and patch for MQL5 compatibility.
-    """
-    import torch
-
-    path = os.path.join(out_dir, "model.onnx")
-
-    # Build a dummy input on the same device as the model's first parameter.
-    try:
-        device = next(model.layers[1].weights[0].value.parameters()).device
-    except (StopIteration, AttributeError):
-        device = torch.device("cpu")
-
-    dummy = torch.zeros(1, sequence_length, n_features, dtype=torch.float32, device=device)
-
-    # Keras 3 (torch backend) exposes the raw nn.Module via model._tracker or
-    # by simply calling model(x) — we wrap the Keras call in a thin nn.Module
-    # so torch.onnx can trace it cleanly.
-    class KerasWrapper(torch.nn.Module):
-        def __init__(self, keras_model):
+    class _Wrapper(torch.nn.Module):
+        def __init__(self, km: keras.Model):
             super().__init__()
-            self.km = keras_model
-            # Register all torch sub-modules so their parameters are visible.
-            for i, layer in enumerate(keras_model.layers):
-                if hasattr(layer, "_tracker"):
-                    for j, mod in enumerate(layer._tracker.dict["module"].values()):
-                        if isinstance(mod, torch.nn.Module):
-                            self.add_module(f"layer_{i}_{j}", mod)
+            self.km = km
 
-        def forward(self, x):
-            import torch
-            # Keras forward; disable training-mode behaviours.
-            return torch.tensor(
-                self.km(x.numpy(), training=False).numpy()
-            )
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.km(x, training=False)
 
-    # Prefer a simpler approach: call model.predict on dummy to warm up, then
-    # use torch.onnx.export with the Keras model directly as a callable.
-    # Keras 3's torch backend makes model() a valid torch.nn.Module callable.
-    torch_module = model  # Keras Sequential IS a torch.nn.Module under torch backend
+    wrapper = _Wrapper(model).eval()
+    dummy   = torch.zeros(1, SEQUENCE_LEN, n_features, dtype=torch.float32)
 
-    # Warm-up so all lazy layers are built.
-    with torch.no_grad():
-        _ = torch_module(dummy)
+    # --- Primary: standard export -------------------------------------------
+    try:
+        torch.onnx.export(
+            wrapper, dummy, OUT_ONNX,
+            input_names=["input"],
+            output_names=["output"],
+            dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
+            opset_version=17,
+        )
+        print(f"✓ ONNX saved  →  {OUT_ONNX}")
+        return
+    except Exception as err:
+        print(f"  torch.onnx.export failed ({err}); trying dynamo_export …")
 
-    torch.onnx.export(
-        torch_module,
-        dummy,
-        path,
-        input_names=["input"],
-        output_names=["output"],
-        dynamic_axes={"input": {0: "batch"}, "output": {0: "batch"}},
-        opset_version=13,
-    )
-    print(f"Exported via torch.onnx → {path}")
-    _make_mql5_compatible(path)
-    return path
+    # --- Fallback: dynamo-based export (torch ≥ 2.1) ------------------------
+    try:
+        export_prog = torch.onnx.dynamo_export(wrapper, dummy)
+        export_prog.save(OUT_ONNX)
+        print(f"✓ ONNX (dynamo) saved  →  {OUT_ONNX}")
+    except Exception as err2:
+        raise RuntimeError(
+            f"ONNX export failed entirely: {err2}\n"
+            "Try:  pip install onnx onnxscript  and upgrade torch≥2.1"
+        ) from err2
 
 
-# ── main ──────────────────────────────────────────────────────────────────────
-def main():
-    # --- load data ---
-    df = pd.read_parquet("data.parquet")
-    df = df[
-        (df.index >= pd.Timestamp("2020-01-01")) &
-        (df.index <  pd.Timestamp("2023-01-01"))
-    ]
-    df = df[
-        [c for c in df.columns
-         if "quote asset volume" in c and any(a in c for a in ASSETS)]
-    ]
-    df.columns = [c.replace(" quote asset volume", "") for c in df.columns]
-    cols = ["BTC"] + [c for c in df.columns if c != "BTC"]
-    df   = df[cols]
-    print(f"Data shape: {df.shape}  columns: {list(df.columns)}")
+# ── Main ──────────────────────────────────────────────────────────────────────
 
-    n_features = df.shape[1]
+def main() -> None:
+    # ── 1. Fetch data ────────────────────────────────────────────────────────
+    print("\n=== Connecting to MetaTrader 5 ===")
+    init_mt5()
 
-    # --- prepare sequences ---
-    xs, X_train, X_test, ys, y_train, y_test = generate_data(df, SEQUENCE_LENGTH, N_AHEAD)
+    print("\n=== Fetching hourly closes ===")
+    closes = fetch_closes(SYMBOLS)
+    mt5.shutdown()
 
-    # --- save norm params ---
-    save_norm_params(xs.min_, xs.max_, out_dir="model")
-    save_config(n_features, SEQUENCE_LENGTH, N_AHEAD, out_dir="model")
-    print(f"X_train: {X_train.shape}  y_train: {y_train.shape}")
+    n_features = len(SYMBOLS)                 # always 21
+    target_col = SYMBOLS.index(PRIMARY_SYMBOL)
 
-    # --- build model ---
-    model = Sequential([
-        Input(shape=(SEQUENCE_LENGTH, n_features)),
-        TKAN(100, return_sequences=True),
-        TKAN(100, sub_kan_output_dim=20, sub_kan_input_dim=20, return_sequences=False),
-        Dense(units=N_AHEAD, activation="linear"),
-    ], name="TKAN")
-    model.compile(
-        optimizer=keras.optimizers.Adam(0.001),
-        loss="mse",
-        jit_compile=False,   # TorchScript/torch.compile — set True if supported
-    )
-    model.summary()
+    print(f"\nDataset:  {closes.shape[0]} bars × {n_features} symbols")
+    print(f"Period:   {closes.index[0]}  →  {closes.index[-1]}")
+    avail = [s for s in SYMBOLS if closes[s].any()]
+    print(f"Non-zero: {len(avail)} / {n_features} symbols")
 
-    # --- train ---
+    # ── 2. Log-returns & normalisation ───────────────────────────────────────
+    returns   = log_returns(closes)           # (T, 21)
+    data      = returns.values.astype(np.float32)
+
+    split     = int(len(data) * 0.80)
+    scaler    = MinMaxScaler()
+    train_sc  = scaler.fit_transform(data[:split])
+    test_sc   = scaler.transform(data[split:])
+
+    # ── 3. Save scaler params ────────────────────────────────────────────────
+    # JSON (rich format)
+    meta = {
+        "symbols":        SYMBOLS,
+        "primary_symbol": PRIMARY_SYMBOL,
+        "target_col":     target_col,
+        "sequence_len":   SEQUENCE_LEN,
+        "n_features":     n_features,
+        "min":            scaler.min_.tolist(),
+        "max":            scaler.max_.tolist(),
+    }
+    with open(OUT_SCALER_JSON, "w") as fh:
+        json.dump(meta, fh, indent=2)
+    print(f"✓ {OUT_SCALER_JSON}")
+
+    # CSV — two rows: [0]=min values, [1]=max values  (no header)
+    # MQL5 reads these as two sequential lines of comma-separated floats
+    np.savetxt(OUT_SCALER_CSV,
+               np.vstack([scaler.min_, scaler.max_]),
+               delimiter=",", fmt="%.12f", comments="")
+    print(f"✓ {OUT_SCALER_CSV}")
+
+    # ── 4. Sequences ─────────────────────────────────────────────────────────
+    X_train, y_train = make_sequences(train_sc, target_col)
+
+    # Build test sequences: last SEQUENCE_LEN rows of train provide history
+    full_sc = np.vstack([train_sc, test_sc])
+    overlap  = full_sc[split - SEQUENCE_LEN :]
+    X_all, y_all = make_sequences(overlap, target_col)
+    X_test = X_all
+    y_test = y_all
+
+    print(f"\nTrain sequences: {X_train.shape}")
+    print(f"Test  sequences: {X_test.shape}")
+
+    # ── 5. Train ─────────────────────────────────────────────────────────────
+    print("\n=== Training TKAN (torch backend, no TensorFlow) ===")
+    model = build_tkan(n_features)
+
     t0 = time.time()
     model.fit(
         X_train, y_train,
         batch_size=BATCH_SIZE,
-        epochs=N_MAX_EPOCHS,
-        validation_split=0.2,
-        callbacks=make_callbacks(),
+        epochs=MAX_EPOCHS,
+        validation_split=0.20,
+        callbacks=callbacks(),
         shuffle=True,
         verbose=1,
     )
-    print(f"Training time: {time.time() - t0:.1f}s")
+    elapsed = time.time() - t0
+    print(f"Training time: {elapsed:.1f}s")
 
-    # --- export ONNX (torch-native, no TF) ---
-    try:
-        import torch   # guaranteed present since KERAS_BACKEND=torch
-        export_onnx_torch(model, SEQUENCE_LENGTH, n_features, out_dir="model")
-    except Exception as e:
-        print(f"torch.onnx export failed: {e}")
-        print("Model weights are still available via model.save_weights('model/weights.weights.h5')")
-        model.save_weights("model/weights.weights.h5")
+    # ── 6. Evaluate ──────────────────────────────────────────────────────────
+    preds = model.predict(X_test, verbose=0)
+    r2   = r2_score(y_test, preds)
+    rmse = root_mean_squared_error(y_test, preds)
+    print(f"\nTest  R²  : {r2:.4f}")
+    print(f"Test RMSE : {rmse:.8f}")
 
-    print("\nDone. Files in ./model/:")
-    for f in sorted(os.listdir("model")):
-        print(" ", f)
+    # ── 7. ONNX export ───────────────────────────────────────────────────────
+    print("\n=== Exporting to ONNX ===")
+    export_onnx(model, n_features)
+
+    print("\n=== Done ===")
+    print(f"Copy to MT5 Files/:  {OUT_ONNX}  +  {OUT_SCALER_CSV}")
 
 
 if __name__ == "__main__":

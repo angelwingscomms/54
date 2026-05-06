@@ -247,7 +247,7 @@ def main():
 
 
     save_norm_params_regression(xmin.squeeze(), xmax.squeeze(), output_dir=str(model_dir))
-    save_config_regression({**cfg, 'input_dim': input_dim, 'enabled_symbols': symbols}, output_dir=str(model_dir))
+    save_config_regression({**cfg, 'input_dim': input_dim * seq_len, 'enabled_symbols': symbols}, output_dir=str(model_dir))
 
     with open(model_dir / 'config.yaml', 'w') as f:
         yaml.dump({**cfg, 'input_dim': input_dim}, f, default_flow_style=False)

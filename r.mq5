@@ -2,10 +2,10 @@
 #property version "1.00"
 #property strict
 
-#include "models/2904-100238/config.mqh"
-#include "models/2904-100238/norm_params.mqh"
+#include "models/0605-054844/config.mqh"
+#include "models/0605-054844/norm_params.mqh"
 
-#resource "\\Experts\\54\\models\\2904-100238\\model.onnx" as const uchar ExtModel[195458]
+#resource "\Experts\54\models\0605-054844\model.onnx" as const uchar ExtModel[195458]
 
 input double LotSize = 0.01;
 input double MinDiffPercent = 0.15;
@@ -53,14 +53,19 @@ bool BuildFeatureRow(const int barShift, double &row[], double predictedClose = 
    int offset = 0;
    for(int s = 0; s < gFeatureCount; s++) {
       string symbol = gFeatureSymbols[s];
-      double scaler = iClose(symbol, PERIOD_CURRENT, barShift + 1);
+      double scaler = iClose(symbol, PERIOD_CURRENT, barShift + CFG_SEQUENCE_LENGTH + 1);
       if(scaler <= 0) {
          double sum = 0; int count = 0;
-         for(int j = 1; j <= 24 * 14; j++) {
-            double c = iClose(symbol, PERIOD_CURRENT, barShift + j);
+         int maxBars = MathMin(24 * 14, barShift + CFG_SEQUENCE_LENGTH);
+         for(int j = 1; j <= maxBars; j++) {
+            double c = iClose(symbol, PERIOD_CURRENT, barShift + CFG_SEQUENCE_LENGTH + j);
             if(c > 0) { sum += c; count++; }
          }
          scaler = count > 0 ? sum / count : 1.0;
+      }
+      for(int i = 0; i < CFG_SEQUENCE_LENGTH - 1; i++) {
+         double close = iClose(symbol, PERIOD_CURRENT, barShift + i + 1);
+         row[offset++] = (close > 0 && scaler > 0) ? close / scaler : 1.0;
       }
       if(predictedClose > 0 && symbol == gSymbol) {
          row[offset++] = predictedClose / scaler;
