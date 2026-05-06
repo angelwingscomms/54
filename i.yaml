@@ -1,5 +1,5 @@
 # ── data ─────────────────────────────────────────────────────────────────────
-data_path: data/xau          # reads xau.csv from current directory
+data_path: data/bitcoin          # reads xau.csv from current directory
 symbol: XAUUSD          # primary symbol to predict (must be in the CSV)
 
 # which OHLCV column(s) to use as features.
@@ -8,8 +8,25 @@ features: close
 
 # additional symbols to use as input features (must be in the same CSV)
 feature_symbols:
-  $USDX: true
-  USDJPY: true
+  BCHUSD: true
+  BTCUSD: true
+  ETHUSD: true
+  LTCUSD: true
+  XRPUSD: true
+  ADAUSD: true
+  AVAXUSD: true
+  AXSUSD: true
+  DOGEUSD: true
+  DOTUSD: true
+  EOSUSD: true
+  FILUSD: true
+  LINKUSD: true
+  MATICUSD: true
+  MIOTAUSD: true
+  SOLUSD: true
+  TRXUSD: true
+  UNIUSD: true
+  XLMUSD: true
 
 # ── sequence / forecast horizon ───────────────────────────────────────────────
 sequence_length: 54     # look-back window (bars)

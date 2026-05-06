@@ -1,4 +1,4 @@
-#include "gold_symbols.mqh"
+#include "symbols.mqh"
 
 input int InpBarsToCopy = 144000;
 input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;
@@ -15,7 +15,7 @@ void OnStart() {
       return;
    }
    
-   FileWrite(fileHandle, "datetime", "symbol", "open", "high", "low", "close");
+   FileWrite(fileHandle, "datetime", "symbol", "open", "high", "low", "close", "tick_volume");
 
    int symbolCount = ArraySize(SYMBOLS);
    int totalRows = 0;
@@ -53,7 +53,8 @@ void OnStart() {
             DoubleToString(rates[i].open, digits),
             DoubleToString(rates[i].high, digits),
             DoubleToString(rates[i].low, digits),
-            DoubleToString(rates[i].close, digits)
+            DoubleToString(rates[i].close, digits),
+            IntegerToString(rates[i].tick_volume)
          );
       }
 
