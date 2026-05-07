@@ -44,6 +44,7 @@ FEATURE_SYMS =[k for k, v in cfg.get("feature_symbols", {}).items() if v]
 OUTPUT_PATH  = cfg.get("output_path", "model.onnx")
 ROLLING_DAYS = int(cfg.get("rolling_days", 14))
 OPSET        = int(cfg.get("onnx_opset", 18))
+TARGET_MODE  = str(cfg.get("target_mode", "price")).strip().lower()
 
 MQL5_FEATURES = {"open", "high", "low", "close", "tick_volume", "volume", "vol", "real_volume", "spread"}
 
@@ -73,6 +74,17 @@ if unsupported:
         "features must be reproducible by i.mq5 at runtime; unsupported: "
         + ", ".join(unsupported)
     )
+
+if TARGET_MODE not in ("price", "range_close"):
+    raise ValueError("target_mode must be 'price' or 'range_close'")
+
+if TARGET_MODE == "range_close":
+    if N_AHEAD != 1:
+        raise ValueError("target_mode=range_close currently requires n_ahead: 1")
+    required = {"open", "high", "low", "close"}
+    missing = sorted(required - set(FEATURES))
+    if missing:
+        raise ValueError("target_mode=range_close requires input features: " + ", ".join(missing))
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 class MinMaxScaler:
@@ -146,7 +158,24 @@ def generate_sequences(df, seq_len, n_ahead):
     X_list, y_list = [],[]
     for i in range(seq_len, len(tmp_df) - n_ahead + 1):
         X_list.append(tmp_df.iloc[i - seq_len : i].values)
-        y_list.append(tmp_df.iloc[i : i + n_ahead, :n_target_cols].values)
+        if TARGET_MODE == "range_close":
+            row = df.loc[tmp_df.index[i]]
+            scale = scaler_df.loc[tmp_df.index[i], f"{SYMBOL}_close"]
+            if not np.isfinite(scale) or scale <= 0:
+                scale = row[f"{SYMBOL}_close"]
+            if not np.isfinite(scale) or scale <= 0:
+                scale = 1.0
+
+            bar_open = row[f"{SYMBOL}_open"]
+            up_range = max(row[f"{SYMBOL}_high"] - bar_open, 0.0)
+            down_range = max(bar_open - row[f"{SYMBOL}_low"], 0.0)
+            y_list.append([
+                row[f"{SYMBOL}_close"] / scale,
+                up_range / scale,
+                down_range / scale,
+            ])
+        else:
+            y_list.append(tmp_df.iloc[i : i + n_ahead, :n_target_cols].values)
 
     X, y = np.array(X_list, dtype=np.float32), np.array(y_list, dtype=np.float32)
     split = int(len(X) * 0.8)
@@ -163,6 +192,9 @@ def generate_sequences(df, seq_len, n_ahead):
 
 X_scaler, X_train, X_test, y_scaler, y_train, y_test = generate_sequences(wide, SEQ_LEN, N_AHEAD)
 n_out = y_train.shape[1]
+TARGET_NAMES = ["close", "up_range", "down_range"] if TARGET_MODE == "range_close" else [
+    col.split("_", 1)[1] for col in target_cols for _ in range(N_AHEAD)
+]
 
 # ── model & training ──────────────────────────────────────────────────────────
 keras.utils.set_random_seed(cfg.get("seed", 42))
@@ -272,6 +304,10 @@ with open(mqh_path, "w") as f:
     f.write(f"const int    MODEL_ROLLING_DAYS = {ROLLING_DAYS};\n")
     f.write(f"const int    MODEL_N_FEATURES   = {flat_features_in};\n")
     f.write(f"const int    MODEL_N_OUT        = {n_out};\n\n")
+    f.write(f"const string MODEL_PRIMARY_SYMBOL = {json.dumps(SYMBOL)};\n")
+    f.write(f"const string MODEL_TARGET_MODE    = {json.dumps(TARGET_MODE)};\n")
+    target_array = [json.dumps(name) for name in TARGET_NAMES]
+    f.write(f"const string MODEL_TARGET_NAMES[{len(TARGET_NAMES)}] = {{{', '.join(target_array)}}};\n\n")
 
     sym_array = [json.dumps(sym) for sym, _ in feature_pairs]
     feat_array = [json.dumps(feat) for _, feat in feature_pairs]

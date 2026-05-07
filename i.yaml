@@ -3,8 +3,10 @@ data_path: data/bitcoin          # reads xau.csv from current directory
 symbol: BTCUSD          # primary symbol to predict (must be in the CSV)
 
 # which OHLCV column(s) to use as features.
-# Can be a single string or a list: [open, high, low, close, tick_volume]
-features: close
+features: [open, high, low, close, tick_volume]
+
+# predict close plus current-bar high/low ranges for EA risk filtering
+target_mode: range_close
 
 # additional symbols to use as input features (must be in the same CSV)
 feature_symbols:
