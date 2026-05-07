@@ -5,7 +5,14 @@ Exports trained model to ONNX for use in MetaTrader 5 EAs.
 Applies an MQL5 Compatibility Patch to bypass ERR_ONNX_INVALID_SHAPE (5805).
 """
 
+from keras.layers import LSTM, Dense, Input
 import os, sys, argparse, time, json
+import numpy as np
+import pandas as pd
+import keras
+from keras.models import Sequential
+from sklearn.metrics import r2_score
+from sklearn.metrics import mean_squared_error
 import yaml
 
 parser = argparse.ArgumentParser()
@@ -18,13 +25,6 @@ with open(args.config) as f:
 BACKEND = cfg.get("backend", "jax")
 os.environ["KERAS_BACKEND"] = BACKEND
 
-import numpy as np
-import pandas as pd
-import keras
-from keras.models import Sequential
-from keras.layers import LSTM, Dense, Input, GRU
-from sklearn.metrics import r2_score
-from sklearn.metrics import mean_squared_error
 def root_mean_squared_error(y_true, y_pred):
     return float(np.sqrt(mean_squared_error(y_true, y_pred)))
 from tkan import TKAN
