@@ -1,7 +1,7 @@
 #include "symbols.mqh"
 
 input int InpBarsToCopy = 144000;
-input ENUM_TIMEFRAMES InpTimeframe = PERIOD_H1;
+input ENUM_TIMEFRAMES InpTimeframe = PERIOD_M15;
 input string InpOutputFile = "data.csv";
 
 void OnStart() {

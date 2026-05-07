@@ -8,13 +8,20 @@ Applies an MQL5 Compatibility Patch to bypass ERR_ONNX_INVALID_SHAPE (5805).
 import os, sys, argparse, time, json
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
 import yaml
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", default="i.yaml")
+parser.add_argument("-n", "--name", default=None, help="model folder name (default: ddmm-hhmmss)")
 args = parser.parse_args()
+
+MODEL_FOLDER_NAME = args.name
+if MODEL_FOLDER_NAME is None:
+    now = datetime.now()
+    MODEL_FOLDER_NAME = f"{now.day:02d}{now.month:02d}-{now.hour:02d}{now.minute:02d}{now.second:02d}"
 
 with open(args.config) as f:
     cfg = yaml.safe_load(f)
@@ -42,10 +49,14 @@ HIDDEN_UNITS = int(cfg.get("hidden_units", 100))
 _feat_cfg    = cfg.get("features", "close")
 FEATURES     = _feat_cfg if isinstance(_feat_cfg, list) else [_feat_cfg]
 FEATURE_SYMS =[k for k, v in cfg.get("feature_symbols", {}).items() if v]
-OUTPUT_PATH  = cfg.get("output_path", "model.onnx")
 ROLLING_DAYS = int(cfg.get("rolling_days", 14))
 OPSET        = int(cfg.get("onnx_opset", 18))
 TARGET_MODE  = str(cfg.get("target_mode", "price")).strip().lower()
+
+MODEL_OUT_DIR = os.path.join("./models", MODEL_FOLDER_NAME)
+os.makedirs(MODEL_OUT_DIR, exist_ok=True)
+
+OUTPUT_PATH = os.path.join(MODEL_OUT_DIR, "model.onnx")
 
 MQL5_FEATURES = {"open", "high", "low", "close", "tick_volume", "volume", "vol", "real_volume", "spread"}
 
@@ -284,7 +295,7 @@ def make_mql5_compatible(onnx_path, seq_len, flat_features_in, flat_features_out
 make_mql5_compatible(OUTPUT_PATH, SEQ_LEN, input_shape[1], n_out)
 
 # ── save .mqh arrays ──────────────────────────────────────────────────────────
-mqh_path = OUTPUT_PATH.replace(".onnx", "_meta.mqh")
+mqh_path = os.path.join(MODEL_OUT_DIR, "model_meta.mqh")
 
 def to_list(x):
     if hasattr(x, "tolist"): return x.tolist()

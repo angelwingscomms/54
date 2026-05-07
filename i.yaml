@@ -1,5 +1,5 @@
 # ── data ─────────────────────────────────────────────────────────────────────
-data_path: data/bitcoin          # reads xau.csv from current directory
+data_path: data/btc15          # reads xau.csv from current directory
 symbol: BTCUSD          # primary symbol to predict (must be in the CSV)
 
 # which OHLCV column(s) to use as features.
