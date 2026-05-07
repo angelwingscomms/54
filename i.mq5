@@ -7,9 +7,9 @@
 #property strict
 
 #include <Trade\Trade.mqh>
-#include "model_meta.mqh" 
+#include "models/btc1h/model_meta.mqh" 
 
-#resource "model.onnx" as uchar ExtModel[]
+#resource "\\Experts\\54\\models\\btc1h\\model.onnx" as uchar ExtModel[]
 
 //── Inputs ─────────────────────────────────────────────────────────
 input group "=== Trade ==="

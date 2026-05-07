@@ -1,5 +1,5 @@
 # ── data ─────────────────────────────────────────────────────────────────────
-data_path: data/btc15          # reads xau.csv from current directory
+data_path: data/btc15m          # reads xau.csv from current directory
 symbol: BTCUSD          # primary symbol to predict (must be in the CSV)
 
 # which OHLCV column(s) to use as features.
@@ -42,7 +42,7 @@ model: TKAN             # TKAN | GRU | LSTM
 hidden_units: 100
 
 # ── training ──────────────────────────────────────────────────────────────────
-epochs: 1            # max epochs (early stopping will kick in earlier)
+epochs: 9            # max epochs (early stopping will kick in earlier)
 batch_size: 128
 lr: 0.001
 seed: 42
