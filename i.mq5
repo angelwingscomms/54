@@ -27,6 +27,15 @@ input int    InpSLBufferPoints            = 0;    // Put SL beyond predicted ran
 input double InpStopoutSafetyFactor       = 0.75; // Require cushion above stopout
 input bool   InpVerboseLogs               = true; // Verbose decision logs
 
+input group "=== Optional Checks ==="
+input bool   InpCheckExistingPosition     = false; // Block duplicate magic positions
+input bool   InpCheckMinMove              = false; // Require forecast move >= ratio * ATR
+input bool   InpCheckTargetTouched        = false; // Skip if target already touched this bar
+input bool   InpCheckPredictedAdverse     = false; // Skip if predicted adverse move is too large
+input bool   InpCheckMaxSL                = false; // Skip when SL exceeds InpMaxSLPoints
+input bool   InpCheckForecastTPDistance   = false; // Skip when model TP is too close
+input bool   InpCheckStopoutSafety        = false; // Skip when margin/stopout cushion fails
+
 //── Globals ─────────────────────────────────────────────────────────
 static long   g_onnx         = INVALID_HANDLE;
 static CTrade g_trade;
@@ -661,14 +670,14 @@ void OnTick()
                   range_adjusted ? "true" : "false");
    }
 
-   if(HasOpenPosition())
+   if(InpCheckExistingPosition && HasOpenPosition())
    {
       if(InpVerboseLogs)
          Print("No trade: existing position with this symbol and magic number.");
       return;
    }
 
-   if(MathAbs(move) < min_move)
+   if(InpCheckMinMove && MathAbs(move) < min_move)
    {
       if(InpVerboseLogs)
          PrintFormat("No trade: forecast move too small. move=%.5f min_move=%.5f ratio=%.3f",
@@ -677,7 +686,7 @@ void OnTick()
    }
 
    bool is_buy = (move > 0.0);
-   if(is_buy)
+   if(InpCheckTargetTouched && is_buy)
    {
       if(bar_high >= forecast_price || mid >= forecast_price)
       {
@@ -687,7 +696,7 @@ void OnTick()
          return;
       }
    }
-   else
+   else if(InpCheckTargetTouched)
    {
       if(bar_low <= forecast_price || mid <= forecast_price)
       {
@@ -704,7 +713,9 @@ void OnTick()
    else if(!is_buy && pred_high > mid)
       adverse_points = (pred_high - mid) / _Point;
 
-   if(InpMaxPredictedAdversePoints > 0 && adverse_points > (double)InpMaxPredictedAdversePoints)
+   if(InpCheckPredictedAdverse &&
+      InpMaxPredictedAdversePoints > 0 &&
+      adverse_points > (double)InpMaxPredictedAdversePoints)
    {
       if(InpVerboseLogs)
          PrintFormat("No trade: predicted adverse move too large. side=%s adverse_pts=%.1f limit_pts=%d pred_low=%.5f pred_high=%.5f mid=%.5f",
@@ -726,7 +737,7 @@ void OnTick()
    double max_sl_dist = InpMaxSLPoints > 0 ? PointsToPrice((double)InpMaxSLPoints) : 0.0;
    double sl_dist = MathMax(InpSL_ATR_Mult * atr, min_sl_dist);
 
-   if(max_sl_dist > 0.0 && sl_dist > max_sl_dist)
+   if(InpCheckMaxSL && max_sl_dist > 0.0 && sl_dist > max_sl_dist)
    {
       if(InpVerboseLogs)
          PrintFormat("No trade: required SL distance exceeds max. required_pts=%.1f max_pts=%d",
@@ -741,7 +752,7 @@ void OnTick()
       double range_sl_dist = is_buy ? ask - range_sl : range_sl - bid;
       if(range_sl_dist > sl_dist)
       {
-         if(max_sl_dist > 0.0 && range_sl_dist > max_sl_dist)
+         if(InpCheckMaxSL && max_sl_dist > 0.0 && range_sl_dist > max_sl_dist)
          {
             if(InpVerboseLogs)
                PrintFormat("No trade: predicted-range SL exceeds max. range_sl_pts=%.1f max_pts=%d",
@@ -760,14 +771,14 @@ void OnTick()
    else
    {
       tp = forecast_price;
-      if(is_buy && tp <= ask + min_stop)
+      if(InpCheckForecastTPDistance && is_buy && tp <= ask + min_stop)
       {
          if(InpVerboseLogs)
             PrintFormat("No trade: forecast TP is too close for buy. tp=%.5f ask=%.5f min_stop_pts=%.1f",
                         tp, ask, min_stop / _Point);
          return;
       }
-      if(!is_buy && tp >= bid - min_stop)
+      if(InpCheckForecastTPDistance && !is_buy && tp >= bid - min_stop)
       {
          if(InpVerboseLogs)
             PrintFormat("No trade: forecast TP is too close for sell. tp=%.5f bid=%.5f min_stop_pts=%.1f",
@@ -791,7 +802,7 @@ void OnTick()
    tp = NormalisePrice(tp);
 
    double actual_sl_points = PriceDistancePoints(entry, sl);
-   if(max_sl_dist > 0.0 && actual_sl_points > (double)InpMaxSLPoints + 0.5)
+   if(InpCheckMaxSL && max_sl_dist > 0.0 && actual_sl_points > (double)InpMaxSLPoints + 0.5)
    {
       if(InpVerboseLogs)
          PrintFormat("No trade: broker-adjusted SL exceeds max. sl_pts=%.1f max_pts=%d sl=%.5f entry=%.5f",
@@ -803,21 +814,27 @@ void OnTick()
    double lots = NormaliseVolume(InpLots);
    double order_margin, sl_profit, equity_after, margin_after, free_after, level_after;
    string stopout_reason;
-   bool stopout_ok = CheckStopoutSafety(is_buy, lots, entry, sl,
-                                        order_margin, sl_profit, equity_after,
-                                        margin_after, free_after, level_after,
-                                        stopout_reason);
-
-   if(InpVerboseLogs)
-      PrintFormat("Stopout check ok=%s lots=%.4f sl_pts=%.1f margin=%.2f sl_profit=%.2f equity_after=%.2f margin_after=%.2f free_after=%.2f level_after=%.2f reason=%s",
-                  stopout_ok ? "true" : "false", lots, actual_sl_points, order_margin, sl_profit,
-                  equity_after, margin_after, free_after, level_after, stopout_reason);
-
-   if(!stopout_ok)
+   bool stopout_ok = true;
+   if(InpCheckStopoutSafety)
    {
-      PrintFormat("No trade: stopout safety check failed. %s", stopout_reason);
-      return;
+      stopout_ok = CheckStopoutSafety(is_buy, lots, entry, sl,
+                                      order_margin, sl_profit, equity_after,
+                                      margin_after, free_after, level_after,
+                                      stopout_reason);
+
+      if(InpVerboseLogs)
+         PrintFormat("Stopout check ok=%s lots=%.4f sl_pts=%.1f margin=%.2f sl_profit=%.2f equity_after=%.2f margin_after=%.2f free_after=%.2f level_after=%.2f reason=%s",
+                     stopout_ok ? "true" : "false", lots, actual_sl_points, order_margin, sl_profit,
+                     equity_after, margin_after, free_after, level_after, stopout_reason);
+
+      if(!stopout_ok)
+      {
+         PrintFormat("No trade: stopout safety check failed. %s", stopout_reason);
+         return;
+      }
    }
+   else if(InpVerboseLogs)
+      Print("Stopout check disabled.");
 
    string comment = StringFormat("TKAN fc=%.2f adv=%.0f", forecast_price, adverse_points);
    bool sent = is_buy ? g_trade.Buy(lots,  _Symbol, ask, sl, tp, comment) :
