@@ -45,6 +45,35 @@ OUTPUT_PATH  = cfg.get("output_path", "model.onnx")
 ROLLING_DAYS = int(cfg.get("rolling_days", 14))
 OPSET        = int(cfg.get("onnx_opset", 18))
 
+MQL5_FEATURES = {"open", "high", "low", "close", "tick_volume", "volume", "vol", "real_volume", "spread"}
+
+def clean_feature_name(feature):
+    if feature is None:
+        return "close"
+    feature = str(feature).strip().lower()
+    return "close" if feature in ("", "none", "null") else feature
+
+def unique_nonempty(values):
+    out, seen = [], set()
+    for value in values:
+        text = str(value).strip()
+        if text and text not in seen:
+            out.append(text)
+            seen.add(text)
+    return out
+
+SYMBOL = str(SYMBOL).strip()
+FEATURES = [clean_feature_name(f) for f in FEATURES]
+FEATURE_SYMS = [s for s in unique_nonempty(FEATURE_SYMS) if s != SYMBOL]
+ALL_SYMS = [SYMBOL] + FEATURE_SYMS
+
+unsupported = sorted({f for f in FEATURES if f not in MQL5_FEATURES})
+if unsupported:
+    raise ValueError(
+        "features must be reproducible by i.mq5 at runtime; unsupported: "
+        + ", ".join(unsupported)
+    )
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 class MinMaxScaler:
     def __init__(self, feature_axis=None, minmax_range=(0.0, 1.0)):
@@ -78,30 +107,40 @@ def _parse_datetime(s: str) -> str:
     date_part, time_part = s.split(" ", 1)
     return f"{date_part} {time_part.replace('-', ':')}"
 
-def load_and_pivot(data_path, symbol, feature_syms, features):
+def load_and_pivot(data_path, symbol, all_syms, features):
     csv = data_path if data_path.endswith(".csv") else data_path + ".csv"
     raw = pd.read_csv(csv, encoding='utf-16')
+    raw.columns = [str(c).strip().lower() for c in raw.columns]
     raw["datetime"] = pd.to_datetime(raw["datetime"].apply(_parse_datetime))
     raw = raw.set_index("datetime").sort_index()
-    all_syms = [symbol] + feature_syms
     raw = raw[raw["symbol"].isin(all_syms)]
+    missing = [f for f in features if f not in raw.columns]
+    if missing:
+        raise ValueError("CSV is missing configured feature columns: " + ", ".join(missing))
+
     parts = []
+    feature_pairs = []
     for sym in all_syms:
         sub = raw[raw["symbol"] == sym][features].copy()
         sub.columns =[f"{sym}_{feat}" for feat in features]
         parts.append(sub)
-    wide = pd.concat(parts, axis=1).sort_index().ffill().dropna()
+        feature_pairs.extend((sym, feat) for feat in features)
+
+    wide = pd.concat(parts, axis=1, sort=False).sort_index().ffill().dropna()
     target_cols =[c for c in wide.columns if c.startswith(symbol + "_")]
     other_cols  =[c for c in wide.columns if not c.startswith(symbol + "_")]
-    return wide[target_cols + other_cols], target_cols
+    ordered_cols = target_cols + other_cols
+    pair_by_col = {f"{sym}_{feat}": (sym, feat) for sym, feat in feature_pairs}
+    ordered_pairs = [pair_by_col[col] for col in ordered_cols]
+    return wide[ordered_cols], target_cols, ordered_pairs
 
-wide, target_cols = load_and_pivot(DATA_PATH, SYMBOL, FEATURE_SYMS, FEATURES)
+wide, target_cols, feature_pairs = load_and_pivot(DATA_PATH, SYMBOL, ALL_SYMS, FEATURES)
 n_target_cols = len(target_cols)
 
 ROLLING_BARS = ROLLING_DAYS * 24
 def generate_sequences(df, seq_len, n_ahead):
     scaler_df = df.shift(n_ahead).rolling(ROLLING_BARS).median()
-    tmp_df    = (df / scaler_df).iloc[ROLLING_BARS + n_ahead:].fillna(0.0)
+    tmp_df    = (df / scaler_df).iloc[ROLLING_BARS + n_ahead:].replace([np.inf, -np.inf], 0.0).fillna(0.0)
     scaler_df = scaler_df.iloc[ROLLING_BARS + n_ahead:].fillna(0.0)
 
     X_list, y_list = [],[]
@@ -209,14 +248,6 @@ def make_mql5_compatible(onnx_path, seq_len, flat_features_in, flat_features_out
     print(f"            Input: [1, {flat_size}] -> [1, {seq_len}, {flat_features_in}]")
     print(f"            Output: [1, {flat_features_out}]")
 
-# ── After model.export(...) in your script ──────────────────────────────────
-
-# ── After model.export(...) in your script ──────────────────────────────────
-# Clean feature strings to prevent empty/None values in MQL5
-FEATURES = [str(f).strip().lower() for f in FEATURES]
-FEATURES =[f if f and f != "none" else "close" for f in FEATURES]
-
-all_syms = [SYMBOL] + FEATURE_SYMS
 make_mql5_compatible(OUTPUT_PATH, SEQ_LEN, input_shape[1], n_out)
 
 # ── save .mqh arrays ──────────────────────────────────────────────────────────
@@ -230,6 +261,10 @@ x_min_list, x_scale_list = to_list(X_scaler.min_), to_list(X_scaler.scale_)
 y_min_list, y_scale_list = to_list(y_scaler.min_), to_list(y_scaler.scale_)
 
 flat_features_in = input_shape[1]
+if len(feature_pairs) != flat_features_in:
+    raise RuntimeError(
+        f"metadata feature count mismatch: {len(feature_pairs)} names for {flat_features_in} model inputs"
+    )
 
 with open(mqh_path, "w") as f:
     f.write(f"const int    MODEL_SEQ_LEN      = {SEQ_LEN};\n")
@@ -238,12 +273,8 @@ with open(mqh_path, "w") as f:
     f.write(f"const int    MODEL_N_FEATURES   = {flat_features_in};\n")
     f.write(f"const int    MODEL_N_OUT        = {n_out};\n\n")
 
-    sym_array = []
-    feat_array =[]
-    for sym in all_syms:
-        for feat in FEATURES:
-            sym_array.append(f'"{sym}"')
-            feat_array.append(f'"{feat}"')
+    sym_array = [json.dumps(sym) for sym, _ in feature_pairs]
+    feat_array = [json.dumps(feat) for _, feat in feature_pairs]
 
     f.write(f"const string MODEL_SYMBOLS[{flat_features_in}] = {{{', '.join(sym_array)}}};\n")
     f.write(f"const string MODEL_FEATURE_NAMES[{flat_features_in}] = {{{', '.join(feat_array)}}};\n\n")
