@@ -222,12 +222,25 @@ model = Sequential([
 model.compile(optimizer=keras.optimizers.Adam(cfg.get("lr", 0.001)), loss="mse")
 
 t0 = time.time()
-model.fit(
+history = model.fit(
     X_train, y_train, batch_size=BATCH_SIZE, epochs=N_EPOCHS, validation_split=0.2,
     callbacks=[keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)],
     verbose=1
 )
 elapsed = time.time() - t0
+
+y_pred = np.asarray(model.predict(X_test, verbose=0))
+test_loss = float(model.evaluate(X_test, y_test, verbose=0))
+test_rmse = root_mean_squared_error(y_test, y_pred)
+test_r2 = float(r2_score(y_test, y_pred, multioutput="uniform_average"))
+best_val_loss = min(history.history.get("val_loss", [float("nan")]))
+
+print("\nEvaluation:")
+print(f"  Best validation loss (MSE): {best_val_loss:.8f}")
+print(f"  Test loss (MSE):           {test_loss:.8f}")
+print(f"  Test RMSE:                 {test_rmse:.8f}")
+print(f"  Test R2:                   {test_r2:.6f}")
+print(f"  Training time:             {elapsed:.1f}s")
 
 # ── export base ONNX ──────────────────────────────────────────────────────────
 model.export(OUTPUT_PATH, format="onnx", opset_version=OPSET)
