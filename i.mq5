@@ -7,7 +7,7 @@
 #property strict
 
 #include <Trade\Trade.mqh>
-#include "models/btc1h/model_meta.mqh" 
+#include "models/1205-121617/model_meta.mqh" 
 
 #resource "\\Experts\\54\\models\\1205-121617\\model.onnx" as uchar ExtModel[]
 

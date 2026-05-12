@@ -6,6 +6,7 @@ Applies an MQL5 Compatibility Patch to bypass ERR_ONNX_INVALID_SHAPE (5805).
 """
 
 import os, sys, argparse, time, json
+import re
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -352,8 +353,18 @@ print(f"Saved: {mqh_path}\n")
 live_mq5 = Path("i.mq5")
 if live_mq5.exists():
     content = live_mq5.read_text()
-    content = content.replace('#include "model_meta.mqh"', f'#include "models/{MODEL_FOLDER_NAME}/model_meta.mqh"')
-    content = content.replace('#resource "model.onnx"', f'#resource "\\\\Experts\\\\54\\\\models\\\\{MODEL_FOLDER_NAME}\\\\model.onnx"')
+    content = re.sub(
+        r'#include\s+"(?:models/[^"]+/)?model_meta\.mqh"\s*',
+        f'#include "models/{MODEL_FOLDER_NAME}/model_meta.mqh" \n',
+        content,
+        count=1,
+    )
+    content = re.sub(
+        r'#resource\s+"(?:\\\\Experts\\\\54\\\\models\\\\[^"]+\\\\)?model\.onnx"\s+as\s+uchar\s+ExtModel\[\]',
+        f'#resource "\\\\Experts\\\\54\\\\models\\\\{MODEL_FOLDER_NAME}\\\\model.onnx" as uchar ExtModel[]',
+        content,
+        count=1,
+    )
     live_mq5.write_text(content)
     print(f"Updated i.mq5 to use model: {MODEL_FOLDER_NAME}")
 
